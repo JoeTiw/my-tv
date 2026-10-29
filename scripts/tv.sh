@@ -15,7 +15,7 @@ APP_ID=com.tiwari.tv
 config() {
   if [ ! -f app/config.js ]; then
     # A private channel name for the phone, made here so it's never in the repository.
-    channel="tiwari-$(LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 24)"
+    channel="tiwari-$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"   # 24 random hex letters
     sed "s/'CHANNEL'/'$channel'/" config.example.js > app/config.js
     echo "Made app/config.js (it stays on this computer). Add your keys there."
     echo "Your phone channel: https://ntfy.sh/$channel"
@@ -36,6 +36,7 @@ tools() {
 case "${1:-}" in
   setup)
     ip="${2:-}"
+    echo "Setting up Tiwari TV for the TV at ${ip:-?} ..."
     if [ -z "$ip" ]; then echo "Usage: bash scripts/tv.sh setup <TV IP address>" >&2; exit 2; fi
     config
     tools
