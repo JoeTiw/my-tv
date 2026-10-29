@@ -143,7 +143,9 @@ this Mac is awake and on the home Wi-Fi:
 - **Tiwari TV** brings Tiwari TV back to the front (from YouTube, Netflix, anywhere);
 - the app buttons work while another app is open;
 - notes pop up as a small TV notification while someone's watching something else;
-- "Hey TV" while another app is open brings Tiwari TV forward to answer.
+- "Hey TV" while another app is open brings Tiwari TV forward to answer;
+- **the dock shows your TV's own apps with their own icons**: newer LG TVs won't tell a Developer Mode app which
+  apps they have, so the helper asks the TV and sends Tiwari TV the list and icons (again whenever they change).
 
 `~/.tiwari-tv/helper.log` shows what it did; `bash scripts/tv.sh helper off` stops it. Without the helper, everything
 else still works; the phone page says when the helper isn't answering.

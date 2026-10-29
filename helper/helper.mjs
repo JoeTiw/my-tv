@@ -6,6 +6,7 @@
 //   /tiwari (bring Tiwari TV to the front) · /open <app id> (when Tiwari TV isn't in front to do it)
 //   /status (the phone asks; the helper answers with the volume and what's on screen)
 //   notes, while another app is in front, show as a small TV notification; "Hey TV" brings Tiwari TV forward.
+//   It also sends Tiwari TV the TV's apps with their own icons (newer TVs won't list them to a Developer Mode app).
 //
 //   node helper.mjs          # what macOS keeps running (scripts/tv.sh helper sets it up)
 //   node helper.mjs --pair   # once: the TV asks to allow the connection
@@ -43,8 +44,43 @@ tv.on('connect', () => {
     if (typeof res.muted === 'boolean') muted = res.muted;
     statusSoon();
   });
-  if (pairing) { log('Paired. Tiwari TV Helper can now control the TV.'); setTimeout(() => process.exit(0), 1500); }
+  if (pairing) { log('Paired. Tiwari TV Helper can now control the TV.'); setTimeout(() => process.exit(0), 1500); return; }
+  setTimeout(sendIcons, 3000);
 });
+
+// MARK: - The TV's apps and their icons, for Tiwari TV (a file on the channel, sent only when they change)
+
+const ICONS_SENT = path.join(STATE, 'icons-sent');
+async function sendIcons() {
+  try {
+    const res = await req('ssap://com.webos.applicationManager/listLaunchPoints');
+    const apps = [];
+    for (const p of (res && res.launchPoints) || []) {
+      if (!p.id || p.id === APP_ID) continue;
+      let icon = '';
+      const url = p.largeIcon || p.icon;
+      if (url && /^https?:/.test(url)) {
+        try {
+          const r = await fetch(url, {signal: AbortSignal.timeout(8000)});
+          const type = (r.headers.get('content-type') || 'image/png').split(';')[0];
+          if (r.ok && /^image\//.test(type)) icon = 'data:' + type + ';base64,' + Buffer.from(await r.arrayBuffer()).toString('base64');
+        } catch (e) { /* the name stays */ }
+      }
+      apps.push({id: p.id, title: p.title || p.id, color: p.bgColor || '', icon});
+    }
+    if (!apps.length) return;
+    const json = JSON.stringify({apps});
+    const sig = String(json.length) + ':' + apps.map((a) => a.id + (a.icon ? '+' : '')).join(',');
+    if (fs.existsSync(ICONS_SENT) && fs.readFileSync(ICONS_SENT, 'utf8') === sig && !process.env.TIWARI_FORCE_ICONS) return;
+    const q = new URLSearchParams({title: 'Tiwari TV', filename: 'apps.json', message: '/icons'});
+    const r = await fetch(NTFY + encodeURIComponent(settings.channel) + '?' + q, {method: 'POST', body: json});
+    if (r.ok) { fs.writeFileSync(ICONS_SENT, sig); log('Sent Tiwari TV the TV\'s', apps.length, 'apps and their icons.'); }
+  } catch (err) {
+    log('Could not list the TV\'s apps:', err.message || err);
+  }
+}
+// Again every day (a new app installed): only sent when something changed.
+setInterval(() => { if (connected) sendIcons(); }, 24 * 3600000);
 
 function req(uri, payload) {
   return new Promise((resolve, reject) => {

@@ -10,6 +10,7 @@
  *  - /open <app id or name>       → opens that app (only when sent just now, never from a replay)
  *  - a photo with "/frame"        → into the photo frame (shown after a few quiet minutes)
  *  - /frame start · stop · clear  → the frame now, back to home, or no more photos in it
+ *  - a file with "/icons"         → the TV's apps and their icons, from the helper at home
  *  - anything else                → a note: big for a moment, then small in the corner for a day
  */
 var Inbox = (function () {
@@ -132,6 +133,7 @@ var Inbox = (function () {
   function handle(m, fresh) {
     for (var t = 0; m.tags && t < m.tags.length; t++) if (String(m.tags[t]).indexOf('tiwari-') === 0) return;   // the TV's own
     var text = String(m.message || ''), a = m.attachment;
+    if (a && a.url && /^\s*\/icons\s*$/i.test(text)) { takeIcons(a.url); return; }
     if (a && a.url && /^image\//.test(a.type || '') && /^\s*\/frame\b/i.test(text)) {
       framePhoto(a.url, m);
       return;
@@ -217,6 +219,22 @@ var Inbox = (function () {
     var list = Home.apps().map(function (a) { return {id: a.id, title: a.title, color: a.color}; });
     U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=tiwari-apps',
       {method: 'POST', body: JSON.stringify(list), headers: {'Content-Type': 'text/plain'}}, function () {});
+  }
+
+  /** The helper's {apps: [{id, title, color, icon (a data: URL)}]}: kept, and the dock drawn again with them. */
+  function takeIcons(url) {
+    U.http(url, {type: 'json', timeout: 60000}, function (err, data) {
+      if (err || !data || !data.apps || !data.apps.length) return;
+      var icons = {}, list = [];
+      data.apps.forEach(function (x) {
+        if (!x || !x.id) return;
+        list.push({id: String(x.id), title: String(x.title || x.id), color: /^#[0-9a-f]{6}$/i.test(x.color || '') ? x.color : ''});
+        if (/^data:image\/(png|jpeg|webp|gif);base64,/.test(x.icon || '')) icons[x.id] = x.icon;
+      });
+      U.save('tvApps', list);
+      U.save('icons', icons);
+      Home.loadApps();
+    });
   }
 
   // Photos for the frame: kept one by one; one answer to the phone when a batch is in.

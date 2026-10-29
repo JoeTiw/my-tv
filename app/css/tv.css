@@ -117,6 +117,9 @@ body {
   background: linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
 }
 .tile img { position: absolute; left: 50%; top: 50%; max-width: 62%; max-height: 56%; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
+.tile img.logo { max-width: 66%; max-height: 44%; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35)); -webkit-filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35)); }
+.tile img.logo.white { -webkit-filter: brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35)); filter: brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35)); }
+.tile img.icon { width: 100px; height: 100px; max-width: none; max-height: none; border-radius: 24px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3); }
 .tile .word {
   position: absolute; left: 8px; right: 8px; top: 50%; margin-top: -22px; height: 44px; line-height: 44px;
   text-align: center; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden;

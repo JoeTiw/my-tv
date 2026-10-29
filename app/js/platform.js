@@ -40,9 +40,15 @@ var TV = (function () {
   ];
   var SYSTEM = /^com\.webos\.app\.(home|discovery|voice|notificationcenter|accessibility|inputmgr|tvhotkey)|^com\.webos\.exampleapp|^com\.tiwari\.tv$/;
 
+  /** The stand-in list (marked fallback: the TV didn't say which apps it has). */
   function known() {
-    return KNOWN.map(function (k) { return {id: k[0], title: k[1], color: k[2], icon: ''}; });
+    var list = KNOWN.map(function (k) { return {id: k[0], title: k[1], color: k[2], icon: ''}; });
+    list.fallback = true;
+    return list;
   }
+
+  /** An icon path from the TV's own list, as something an <img> can load. */
+  function iconUrl(p) { return !p ? '' : /^(file|https?|data):/.test(p) ? p : 'file://' + p; }
 
   /** The apps to show: [{id, title, color, icon}]. */
   function apps(done) {
@@ -53,7 +59,7 @@ var TV = (function () {
       for (var i = 0; i < reply.launchPoints.length; i++) {
         var p = reply.launchPoints[i];
         if (!p.id || SYSTEM.test(p.id) || p.hidden) continue;
-        list.push({id: p.id, title: p.title || p.id, color: p.bgColor || '', icon: p.largeIcon || p.icon || ''});
+        list.push({id: p.id, title: p.title || p.id, color: p.bgColor || '', icon: iconUrl(p.largeIcon || p.icon)});
       }
       done(list.length ? list : known());
     });
