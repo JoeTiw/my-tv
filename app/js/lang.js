@@ -15,6 +15,8 @@ var L = (function () {
     'Good evening': 'शुभ सन्ध्या',
     'Good night': 'शुभ रात्रि',
     'Opening {app}': '{app} खोल्दै',
+    'Moving {app}: ◀ ▶ to move it, OK to put it down': '{app} सार्दै: ◀ ▶ ले सार्नुहोस्, OK ले राख्नुहोस्',
+    'Done. The apps stay in this order.': 'भयो। एपहरू यही क्रममा रहन्छन्।',
     "{app} didn't open": '{app} खुलेन',
     'Theme: {name}': 'थिम: {name}',
     'dark': 'अँध्यारो',

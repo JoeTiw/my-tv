@@ -6,6 +6,7 @@
   "description": "Runs on a computer at home and controls the TV for the phone page: volume, buttons, apps, notes.",
   "dependencies": {
     "lgtv2": "2.1.0",
-    "tweetnacl": "1.0.3"
+    "tweetnacl": "1.0.3",
+    "ws": "8.22.0"
   }
 }

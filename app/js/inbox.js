@@ -152,7 +152,7 @@ var Inbox = (function () {
     return null;
   }
 
-  function command(text, fresh) {
+  function command(text, fresh, at) {
     var parts = text.replace(/^\s+|\s+$/g, '').split(/\s+/), name = parts[0].toLowerCase(), arg = parts.slice(1).join(' ');
     if (name === '/clear') { notes = []; big = null; U.save('notes', notes); render(); }
     else if (name === '/theme') { if (Home.setTheme(arg.toLowerCase())) Home.toast(L.t('Theme: {name}', {name: L.t(arg.toLowerCase())})); }
@@ -169,6 +169,11 @@ var Inbox = (function () {
       if (arg === 'clear') { Frame.clear(); reply(L.t('The photo frame is empty now.')); }
       else if (arg === 'stop') Frame.stop();
       else if (arg === 'start' && fresh && !Frame.start()) reply(L.t('There are no photos in the frame yet.'));
+    }
+    else if (name === '/order') {
+      // The phone's order for the dock: newer than the one kept (a replay of an older one changes nothing).
+      var ids = arg.split(',').filter(function (x) { return x; }), kept = U.load('order');
+      if (ids.length && (!kept || !kept.at || at > kept.at)) Home.setOrder(ids, at);
     }
     else if (name === '/open' && fresh) {
       var app = findApp(arg);
@@ -188,7 +193,7 @@ var Inbox = (function () {
       else keepPhoto(a.url);
       if (!text || text.indexOf('You received a file') === 0) return;   // what ntfy writes for a photo alone
     }
-    if (text.charAt(0) === '/') { command(text, fresh); return; }
+    if (text.charAt(0) === '/') { command(text, fresh, (m.time || 0) * 1000 || Date.now()); return; }
     if (ASK.test(text)) { if (fresh) Assistant.ask(text.replace(ASK, '')); return; }
     if (!text) return;
     var from = m.title && String(m.title).indexOf('ntfy.sh/') !== 0 ? String(m.title) : '';
@@ -260,6 +265,14 @@ var Inbox = (function () {
     xhr.send();
   }
 
+  /** Asks the helper at home for the TV's apps and icons (at most once an hour). */
+  var iconsAsked = 0;
+  function askIcons() {
+    if (!CH || Date.now() - iconsAsked < 3600000) return;
+    iconsAsked = Date.now();
+    post('/icons?', []);
+  }
+
   /** Tells the phone page which apps this TV has (tagged, so the TV skips it). */
   function announce() {
     if (!CH) return;
@@ -274,7 +287,9 @@ var Inbox = (function () {
       var icons = {}, list = [];
       data.apps.forEach(function (x) {
         if (!x || !x.id) return;
-        list.push({id: String(x.id), title: String(x.title || x.id), color: /^#[0-9a-f]{6}$/i.test(x.color || '') ? x.color : ''});
+        // The TV's own files for the bigger icons, which Tiwari TV may read itself (only plain paths).
+        var paths = (x.paths || []).filter(function (q) { return typeof q === 'string' && q.length < 300 && /^(\/|file:\/\/\/)[\w\/.\-]+$/.test(q); }).slice(0, 3);
+        list.push({id: String(x.id), title: String(x.title || x.id), color: /^#[0-9a-f]{6}$/i.test(x.color || '') ? x.color : '', paths: paths});
         if (/^data:image\/(png|jpeg|webp|gif);base64,/.test(x.icon || '')) icons[x.id] = x.icon;
       });
       U.save('tvApps', list);
@@ -317,7 +332,7 @@ var Inbox = (function () {
   }
 
   return {
-    start: start, poll: poll, handle: handle, reply: reply, announce: announce, dismiss: dismiss, shrink: shrink,
+    start: start, poll: poll, handle: handle, reply: reply, announce: announce, askIcons: askIcons, dismiss: dismiss, shrink: shrink,
     bigShowing: function () { return !!big; }
   };
 })();

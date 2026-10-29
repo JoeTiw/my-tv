@@ -80,6 +80,16 @@
     opacity: 0.95;
   }
   .app span { position: relative; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); padding: 0 6px; }
+  .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .head h2 { margin: 0 0 0 2px; }
+  .arrange { font-size: 14px; font-weight: 600; color: var(--soft); padding: 6px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
+  .arrange.on { color: var(--ink); background: rgba(255, 214, 102, 0.28); }
+  .apps.arranging .app { box-shadow: inset 0 0 0 1.5px rgba(255, 214, 102, 0.7); }
+  .app .mv { position: absolute; top: 0; bottom: 0; width: 34%; display: none; align-items: center; font-size: 26px; font-weight: 700; color: rgba(255, 214, 102, 0.95); }
+  .app .mv.l { left: 0; justify-content: flex-start; padding-left: 8px; }
+  .app .mv.r { right: 0; justify-content: flex-end; padding-right: 8px; }
+  .apps.arranging .app .mv { display: flex; }
+  .apps.arranging .app .mv.off { visibility: hidden; }
   .app:active, .chip:active, .round:active { transform: scale(0.95); }
 
   /* Remote */
@@ -233,7 +243,7 @@
     </section>
 
     <section class="glass">
-      <h2>Open on the TV</h2>
+      <div class="head"><h2>Open on the TV</h2><button class="arrange" id="arrangeBtn">Arrange</button></div>
       <div class="apps" id="apps"></div>
     </section>
 
@@ -375,20 +385,67 @@
 
   // MARK: - Apps
 
+  // Arrange: ‹ › on each app move it earlier or later on the TV's home screen; the TV gets the order a moment later.
+  var arranging = false, shown = [], orderTimer = 0;
+
   function renderApps(list) {
+    shown = list.slice();
     var box = $('apps');
     box.innerHTML = '';
-    list.forEach(function (a) {
+    U_cls(box, 'arranging', arranging);
+    shown.forEach(function (a, i) {
       var b = document.createElement('button');
       b.className = 'app';
       b.style.setProperty('--c', a.color || '#9A8CFF');
       var s = document.createElement('span');
       s.textContent = a.title;
       b.appendChild(s);
-      b.onclick = function () { send('/open ' + a.id).then(sent('Opening ' + a.title + ' on the TV'), failed); };
+      var l = document.createElement('i'), r = document.createElement('i');
+      l.className = 'mv l' + (i === 0 ? ' off' : '');
+      r.className = 'mv r' + (i === shown.length - 1 ? ' off' : '');
+      l.textContent = '\u2039';
+      r.textContent = '\u203A';
+      b.appendChild(l);
+      b.appendChild(r);
+      b.onclick = function (e) {
+        if (!arranging) { send('/open ' + a.id).then(sent('Opening ' + a.title + ' on the TV'), failed); return; }
+        // Which half was tapped: the left moves it earlier, the right later.
+        var box = b.getBoundingClientRect(), earlier = (e.clientX || box.left) < box.left + box.width / 2;
+        moveApp(i, earlier ? -1 : 1);
+      };
       box.appendChild(b);
     });
   }
+
+  function U_cls(node, name, on) { if (on) node.classList.add(name); else node.classList.remove(name); }
+
+  function moveApp(i, d) {
+    var j = i + d;
+    if (j < 0 || j >= shown.length) return;
+    var a = shown[i];
+    shown[i] = shown[j];
+    shown[j] = a;
+    store('apps', JSON.stringify(shown));
+    renderApps(shown);
+    buzz();
+    clearTimeout(orderTimer);
+    orderTimer = setTimeout(sendOrder, 900);
+  }
+
+  function sendOrder() {
+    clearTimeout(orderTimer);
+    orderTimer = 0;
+    send('/order ' + shown.map(function (a) { return a.id; }).join(',')).then(sent('The TV has the new order'), failed);
+  }
+
+  $('arrangeBtn').onclick = function () {
+    arranging = !arranging;
+    if (!arranging && orderTimer) sendOrder();
+    this.textContent = arranging ? 'Done' : 'Arrange';
+    U_cls(this, 'on', arranging);
+    renderApps(shown);
+    if (arranging) toast('Tap the left or right side of an app to move it');
+  };
 
   function knownApps() {
     try { var l = JSON.parse(stored('apps')); if (l && l.length) return l; } catch (e) {}
@@ -441,7 +498,7 @@
       if (tags.indexOf('tiwari-apps') >= 0) {
         try {
           var list = JSON.parse(m.message);
-          if (list && list.length) { store('apps', JSON.stringify(list)); renderApps(list); }
+          if (list && list.length && !arranging) { store('apps', JSON.stringify(list)); renderApps(list); }
         } catch (err) {}
         return;
       }

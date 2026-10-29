@@ -99,7 +99,7 @@ var Home = (function () {
   }
 
   function liftNow(img) {
-    var w = Math.min(256, img.naturalWidth), h = Math.round(img.naturalHeight * w / img.naturalWidth);
+    var w = Math.min(512, img.naturalWidth), h = Math.round(img.naturalHeight * w / img.naturalWidth);
     if (!w || !h) return null;
     var c = document.createElement('canvas');
     c.width = w;
@@ -129,7 +129,13 @@ var Home = (function () {
       var j = p * 4, a = px[j + 3] / 255;
       if (best) {
         var d = Math.max(Math.abs(px[j] - best[0]), Math.abs(px[j + 1] - best[1]), Math.abs(px[j + 2] - best[2])) / 255;
-        a *= Math.max(0, Math.min(1, (d - 0.1) / 0.22));
+        var keep = Math.max(0, Math.min(1, (d - 0.1) / 0.22));
+        // An edge pixel is part mark, part background: take the background out of its color too, so the edge stays
+        // clean instead of a dark (or light) fringe that looks jagged on the glass.
+        if (keep > 0 && keep < 1) {
+          for (var ch = 0; ch < 3; ch++) px[j + ch] = Math.max(0, Math.min(255, Math.round((px[j + ch] - best[ch] * (1 - keep)) / keep)));
+        }
+        a *= keep;
         px[j + 3] = Math.round(a * 255);
       }
       if (a > 0.35) {
@@ -151,7 +157,7 @@ var Home = (function () {
     crop.getContext('2d').drawImage(c, minX, minY, crop.width, crop.height, 0, 0, crop.width, crop.height);
     // A black or gray mark would vanish on smoky glass: it's shown white. A colored one (red letters) stays.
     var bgHex = best ? '#' + ((1 << 24) | (best[0] << 16) | (best[1] << 8) | best[2]).toString(16).slice(1) : '';
-    return {src: crop.toDataURL('image/png'), dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+    return {src: crop.toDataURL('image/png'), w: crop.width, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
   }
 
   function colorfulHex(hex) {
@@ -166,11 +172,8 @@ var Home = (function () {
   function renderDock() {
     var row = $('apps');
     row.innerHTML = '';
-    var n = Math.min(apps.length, visible()), width = n * TILE_W + (n - 1) * GAP;
-    var left = Math.max(SIDE, (1920 - width) / 2);
     for (var i = 0; i < apps.length; i++) {
       var a = apps[i], t = U.el('div', 'tile glass', row);
-      t.style.left = (left + i * (TILE_W + GAP)) + 'px';
       var tint = U.el('div', 'tint', t);
       glow(tint, a.color);
       U.el('div', 'sheen', t);
@@ -179,7 +182,7 @@ var Home = (function () {
       // The app's own icon from the TV, its mark lifted off its background onto the glass (the name stays if it
       // doesn't load; the icon as it is if it's a picture rather than a mark on a plain color).
       if (a.icon) {
-        (function (t, word, src, tint, known) {
+        (function (t, word, src, tint, known, paths) {
           word.style.visibility = 'hidden';
           function plain() {
             var img = U.el('img', 'icon', t);
@@ -192,17 +195,39 @@ var Home = (function () {
             img.src = mark.src;
             // An app we don't know: its icon's own color glows (Hulu's green), unless that's black or white.
             if (!known && mark.bg && colorfulHex(mark.bg)) glow(tint, mark.bg);
+            // Sharper: the TV's own bigger icon file, if Tiwari TV may read it.
+            sharper(paths, mark.w, function (big) { img.className = 'logo' + (big.dark ? ' white' : ''); img.src = big.src; });
           });
-        })(t, word, a.icon, tint, !!knownColors[a.id]);
+        })(t, word, a.icon, tint, !!knownColors[a.id], a.paths);
       }
       U.el('div', 'label', t, a.title);
-      (function (i) {
-        t.addEventListener('mouseover', function () { zone = 'apps'; focus = i; show(); });
-        t.addEventListener('click', function () { zone = 'apps'; focus = i; ok(); });
-      })(i);
+      (function (t) {
+        // Where the tile is now (moving one changes it).
+        function at() { return Array.prototype.indexOf.call(t.parentNode.children, t); }
+        t.addEventListener('mouseover', function () { if (moving) return; zone = 'apps'; focus = at(); show(); });
+        t.addEventListener('click', function () { if (moving) { stopMoving(); return; } zone = 'apps'; focus = at(); ok(); });
+      })(t);
     }
     focus = Math.min(focus, Math.max(0, apps.length - 1));
+    place();
     show();
+  }
+
+  /** The tiles' places, in order. */
+  function place() {
+    var tiles = $('apps').children, n = Math.min(apps.length, visible()), width = n * TILE_W + (n - 1) * GAP;
+    var left = Math.max(SIDE, (1920 - width) / 2);
+    for (var i = 0; i < tiles.length; i++) tiles[i].style.left = (left + i * (TILE_W + GAP)) + 'px';
+  }
+
+  /** The first of the TV's own icon files that is bigger than what the helper sent, lifted the same way. */
+  function sharper(paths, than, done) {
+    var i = 0;
+    (function next() {
+      if (!paths || i >= paths.length) return;
+      var p = paths[i++], src = p.indexOf('file://') === 0 ? p : 'file://' + p;
+      lift(src, function (mark) { if (mark && mark.w > than * 1.2) done(mark); else next(); });
+    })();
   }
 
   function scrollDock() {
@@ -276,6 +301,19 @@ var Home = (function () {
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode, K = TV.keys;
     if (Inbox.bigShowing()) { Inbox.shrink(); e.preventDefault(); return; }
+    if (moving) {
+      if (k === K.left) carry(-1);
+      else if (k === K.right) carry(1);
+      else if ((k === K.ok && !okHeld) || k === K.back || k === 27 || k === 8) stopMoving();
+      e.preventDefault();
+      return;
+    }
+    if (k === K.ok && zone === 'apps' && !row()) {
+      // In the dock OK opens the app when let go; held for a moment, it picks the tile up instead.
+      if (!okHeld) { okLong = false; okHeld = setTimeout(function () { okLong = true; startMoving(); }, 700); }
+      e.preventDefault();
+      return;
+    }
     if (k === K.left) move(-1, 0);
     else if (k === K.right) move(1, 0);
     else if (k === K.up) move(0, -1);
@@ -283,6 +321,14 @@ var Home = (function () {
     else if (k === K.ok) ok();
     else if (k === K.back || k === 27 || k === 8) back();
     else return;
+    e.preventDefault();
+  });
+
+  document.addEventListener('keyup', function (e) {
+    if (e.keyCode !== TV.keys.ok || !okHeld) return;
+    clearTimeout(okHeld);
+    okHeld = 0;
+    if (!okLong && !moving) ok();
     e.preventDefault();
   });
 
@@ -301,9 +347,9 @@ var Home = (function () {
 
   function loadApps(done) {
     TV.apps(function (list) {
-      // A TV that won't list its apps to Tiwari TV (newer webOS): the list the helper sent, if it has.
+      // The list the helper sent (LG's own launcher list, with icons) wins; the TV's own answer, or a stand-in, else.
       var fromHelper = U.load('tvApps');
-      if (list.fallback && fromHelper && fromHelper.length) list = fromHelper;
+      if (fromHelper && fromHelper.length) list = fromHelper;
       var icons = U.load('icons') || {};
       var wanted = C.apps && C.apps.length ? C.apps : null;
       if (wanted) {
@@ -322,14 +368,73 @@ var Home = (function () {
         var c = rgb(hex);
         return !!c && Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2]) >= 60;
       }
-      apps = list.map(function (a) {
+      apps = arrange(list.map(function (a) {
         var color = colors[a.id] || (colorful(a.color) ? a.color : '#9A8CFF');
-        return {id: a.id, title: a.title, color: color, icon: icons[a.id] || a.icon || ''};
-      });
+        return {id: a.id, title: a.title, color: color, icon: icons[a.id] || a.icon || '', paths: a.paths || []};
+      }));
       renderDock();
       Inbox.announce();   // the phone page shows this TV's own apps
+      if (!U.load('tvApps')) Inbox.askIcons();   // no icons yet: the helper at home sends them
       if (done) done();
     });
+  }
+
+  // MARK: - The family's order for the dock (held OK on a tile, or Arrange on the phone)
+
+  /** The apps in the kept order; apps it doesn't name yet (new ones) after them, as the TV lists them. */
+  function arrange(list) {
+    var kept = U.load('order'), ids = kept && kept.ids || [], at = {}, i;
+    for (i = 0; i < ids.length; i++) at[ids[i]] = i;
+    return list.map(function (a, n) { return {a: a, k: a.id in at ? at[a.id] : ids.length + n}; })
+      .sort(function (x, y) { return x.k - y.k; }).map(function (x) { return x.a; });
+  }
+
+  function keepOrder(at) {
+    U.save('order', {ids: apps.map(function (a) { return a.id; }), at: at || Date.now()});
+    Inbox.announce();   // the phone shows the same order
+  }
+
+  /** From the phone: the order, by app id. */
+  function setOrder(ids, at) {
+    U.save('order', {ids: ids, at: at || Date.now()});
+    var id = apps[focus] && apps[focus].id;
+    apps = arrange(apps);
+    for (var i = 0; i < apps.length; i++) if (apps[i].id === id) focus = i;
+    renderDock();
+    Inbox.announce();
+  }
+
+  // Moving a tile: OK held on it picks it up; ◀ ▶ carry it; OK or Back puts it down.
+  var moving = false, okHeld = 0, okLong = false;
+
+  function startMoving() {
+    if (zone !== 'apps' || !apps[focus] || row()) return;
+    moving = true;
+    U.cls(document.body, 'arranging', true);
+    toast(L.t('Moving {app}: ◀ ▶ to move it, OK to put it down', {app: apps[focus].title}));
+    show();
+  }
+
+  function carry(dx) {
+    var to = focus + dx;
+    if (to < 0 || to >= apps.length) return;
+    var a = apps[focus];
+    apps[focus] = apps[to];
+    apps[to] = a;
+    focus = to;
+    // The tiles keep their pictures: only their places change.
+    var row = $('apps'), tiles = row.children, t = tiles[focus - dx], other = tiles[focus];
+    if (dx > 0) row.insertBefore(other, t); else row.insertBefore(t, other);
+    place();
+    show();
+  }
+
+  function stopMoving() {
+    moving = false;
+    U.cls(document.body, 'arranging', false);
+    keepOrder();
+    toast(L.t('Done. The apps stay in this order.'));
+    show();
   }
 
   function start() {
@@ -347,7 +452,7 @@ var Home = (function () {
   }
 
   return {
-    start: start, toast: toast, setTheme: setTheme, setWall: setWall, setRecs: setRecs, setPicks: setPicks, loadApps: loadApps,
+    start: start, toast: toast, setTheme: setTheme, setWall: setWall, setRecs: setRecs, setPicks: setPicks, loadApps: loadApps, setOrder: setOrder,
     apps: function () { return apps; }, open: open
   };
 })();

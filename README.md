@@ -157,7 +157,13 @@ this Mac is awake and on the home Wi-Fi:
 - notes pop up as a small TV notification while someone's watching something else;
 - "Hey TV" while another app is open brings Tiwari TV forward to answer;
 - **the dock shows your TV's own apps with their own icons**: newer LG TVs won't tell a Developer Mode app which
-  apps they have, so the helper asks the TV and sends Tiwari TV the list and icons (again whenever they change).
+  apps they have, so the helper asks the TV and sends Tiwari TV the list and icons (again whenever they change, and
+  whenever Tiwari TV finds it has none and asks). Still only names on the tiles? `bash scripts/tv.sh apps` (TV on)
+  shows each app, where the TV keeps its icon, and whether the helper could fetch it, with the TV's address hidden.
+  Newer LG firmware won't show the helper's main pairing the list of apps (`401 insufficient permissions`), so the
+  helper pairs a second time, only to read that list: `bash scripts/tv.sh helper` asks the TV once more; press Accept.
+- **your order for the apps**: hold OK on a tile to pick it up, ◀ ▶ to carry it, OK to put it down. Or on the phone,
+  Arrange on "Open on the TV", then tap the left or right side of an app. New apps join at the end.
 
 `~/.tiwari-tv/helper.log` shows what it did; `bash scripts/tv.sh helper off` stops it. Without the helper, everything
 else still works; the phone page says when the helper isn't answering.

@@ -8,6 +8,7 @@
 #   bash scripts/tv.sh phone                # the link for your phone's remote page
 #   bash scripts/tv.sh helper               # let this Mac control the TV for the phone (volume, buttons, apps)
 #   bash scripts/tv.sh lock                 # seal everything on your channel with a key (older setups)
+#   bash scripts/tv.sh apps                 # check-up: the TV's apps and whether their icons can be fetched
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -175,6 +176,20 @@ PLIST
     launchctl load "$PLIST"
     echo "The helper is on: volume, buttons and \"Back to Tiwari TV\" work from your phone while this Mac is awake."
     echo "What it's doing: $STATE/helper.log  ·  To turn it off: bash scripts/tv.sh helper off"
+    ;;
+  apps)
+    # A check-up for the logos: what the TV says about each app's icon, and the helper's last words.
+    STATE="$HOME/.tiwari-tv"
+    [ -f "$STATE/helper/helper.mjs" ] || { echo "The helper isn't set up: bash scripts/tv.sh helper" >&2; exit 1; }
+    # The helper from this folder (it may be newer than the one running), and its libraries.
+    cp helper/helper.mjs helper/seal.mjs helper/package.json "$STATE/helper/"
+    (cd "$STATE/helper" && npm install --silent --omit=dev >/dev/null 2>&1) || true
+    PLIST="$HOME/Library/LaunchAgents/com.tiwari.tv.helper.plist"
+    if [ -f "$PLIST" ]; then launchctl unload "$PLIST" 2>/dev/null || true; launchctl load "$PLIST" 2>/dev/null || true; fi
+    echo "The helper's last lines:"
+    tail -n 8 "$STATE/helper.log" 2>/dev/null | sed -E 's/[0-9]{1,3}(\.[0-9]{1,3}){3}/<tv>/g; s/^/  /' || echo "  (no log yet)"
+    echo
+    "$(command -v node)" "$STATE/helper/helper.mjs" --apps
     ;;
   phone)
     config

@@ -107,12 +107,13 @@ body {
   width: 196px;
   height: 168px;
   border-radius: 40px;
-  -webkit-transition: -webkit-transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), box-shadow 0.22s, opacity 0.3s;
-  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), box-shadow 0.22s, opacity 0.3s;
+  /* The focused tile grows by its size, not by scaling: the TV draws it again, sharp, instead of stretching a picture. */
+  -webkit-transition: -webkit-transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), width 0.22s, height 0.22s, margin 0.22s, border-radius 0.22s, left 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1), box-shadow 0.22s, opacity 0.3s;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), width 0.22s, height 0.22s, margin 0.22s, border-radius 0.22s, left 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.1), box-shadow 0.22s, opacity 0.3s;
 }
-.tile .tint { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 40px; overflow: hidden; }
+.tile .tint { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: inherit; overflow: hidden; }
 .tile .sheen {
-  position: absolute; left: 0; top: 0; right: 0; height: 60%; border-radius: 40px 40px 0 0;
+  position: absolute; left: 0; top: 0; right: 0; height: 60%; border-top-left-radius: inherit; border-top-right-radius: inherit;
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
   background: linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
 }
@@ -131,12 +132,31 @@ body {
   -webkit-transition: opacity 0.2s; transition: opacity 0.2s;
 }
 .tile.focus {
-  -webkit-transform: translateY(-14px) scale(1.14);
-  transform: translateY(-14px) scale(1.14);
+  width: 224px;
+  height: 192px;
+  margin-left: -14px;
+  margin-top: -12px;
+  border-radius: 46px;
+  -webkit-transform: translateY(-14px);
+  transform: translateY(-14px);
   box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, 0.85), inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 26px 60px rgba(0, 0, 0, 0.35);
   z-index: 2;
 }
 .tile.focus .label { opacity: 1; }
+
+/* Moving a tile (OK held): it rises, and arrows show it can go either way. */
+body.arranging .tile.focus {
+  -webkit-transform: translateY(-30px);
+  transform: translateY(-30px);
+  box-shadow: inset 0 0 0 3px rgba(255, 214, 102, 0.95), 0 34px 70px rgba(0, 0, 0, 0.45);
+}
+body.arranging .tile.focus::before, body.arranging .tile.focus::after {
+  position: absolute; top: 50%; margin-top: -24px; width: 30px; height: 48px; line-height: 48px; text-align: center;
+  font-size: 40px; font-weight: 700; color: rgba(255, 214, 102, 0.95); text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+body.arranging .tile.focus::before { content: '\2039'; left: -38px; }
+body.arranging .tile.focus::after { content: '\203A'; right: -38px; }
+body.arranging .tile:not(.focus) { opacity: 0.55; }
 
 /* MARK: - Notes from the phone */
 
