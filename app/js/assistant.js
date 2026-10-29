@@ -161,14 +161,25 @@ var Assistant = (function () {
     U.http(url, {type: 'json', headers: headers}, function (err, res) { done(err ? null : res); });
   }
 
-  /** The title on TMDB: done(hit or null). */
+  /**
+   * The title on TMDB: done(hit or null). With its year first; if that finds nothing (a year off by one), without
+   * it; then among movies and shows both (a "movie" that is really a series).
+   */
   function find(item, done) {
-    var kind = item.kind === 'tv' ? 'tv' : 'movie';
-    tmdb('/search/' + kind + '?query=' + encodeURIComponent(item.title)
-      + (item.year ? (kind === 'tv' ? '&first_air_date_year=' : '&year=') + item.year : ''), function (res) {
-      var hit = res && res.results && res.results[0];
-      if (hit) hit.kind = kind;
-      done(hit || null);
+    var kind = item.kind === 'tv' ? 'tv' : 'movie', q = '?query=' + encodeURIComponent(item.title);
+    var year = item.year ? (kind === 'tv' ? '&first_air_date_year=' : '&year=') + item.year : '';
+    function first(res, k) {
+      var list = (res && res.results || []).filter(function (r) { return !k || r.media_type === 'movie' || r.media_type === 'tv'; });
+      var hit = list[0] || null;
+      if (hit) hit.kind = k ? hit.media_type : kind;
+      return hit;
+    }
+    function wider() { tmdb('/search/multi' + q, function (res) { done(first(res, true)); }); }
+    tmdb('/search/' + kind + q + year, function (res) {
+      var hit = first(res);
+      if (hit) { done(hit); return; }
+      if (!year) { wider(); return; }
+      tmdb('/search/' + kind + q, function (res2) { var hit2 = first(res2); if (hit2) done(hit2); else wider(); });
     });
   }
 
@@ -229,7 +240,7 @@ var Assistant = (function () {
   function recommend(items) {
     items = (items || []).slice(0, 4);
     var nodes = cards(recsBox, items, false, function (i) { if (openTitle(items[i])) close(); });
-    hint.textContent = items.length ? L.t('OK opens it · Back closes') : '';
+    hint.textContent = items.length ? L.t('OK opens it · Back closes') + (TMDB ? '' : ' · ' + L.t('Pictures need a TMDB key in config.js')) : '';
     Home.setRecs({nodes: nodes, ok: function (i) { if (openTitle(items[i])) close(); }, back: close});
   }
 

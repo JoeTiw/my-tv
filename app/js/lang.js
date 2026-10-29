@@ -39,6 +39,7 @@ var L = (function () {
     'Happy birthday, {name}!': 'जन्मदिनको शुभकामना, {name}!',
     'Thinking…': 'सोच्दैछु…',
     "Tonight's picks": 'आज बेलुकाका लागि',
+    'Pictures need a TMDB key in config.js': 'तस्बिरका लागि config.js मा TMDB key चाहिन्छ',
     'Trailers need a TMDB key in config.js.': 'ट्रेलरका लागि config.js मा TMDB key चाहिन्छ।',
     "I couldn't find a trailer for {title}.": '{title} को ट्रेलर भेटिएन।',
     'Playing the trailer on YouTube': 'YouTube मा ट्रेलर चल्दै',
