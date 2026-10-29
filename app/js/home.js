@@ -22,6 +22,7 @@ var Home = (function () {
     var now = new Date(), t = U.time(now);
     $('clock').innerHTML = t.hm + '<span class="ampm">' + t.ampm + '</span>';
     $('date').textContent = U.longDate(now);
+    Calendar.render();
     look();
   }
 

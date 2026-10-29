@@ -22,6 +22,15 @@ window.TIWARI = {
   tmdbKey: '',
   region: 'IN',               // which country's streaming catalogue to think about
 
+  // The Nepali date under the clock in Devanagari too (कात्तिक १२, २०८३). false: in English letters only.
+  nepaliScript: true,
+
+  // Birthdays and your own days, shown as they come near (festivals are built in). Examples:
+  //   {name: "Ama's birthday", bs: '05-14', birthday: true}     every year on Bhadra 14 (BS month-day)
+  //   {name: "Papa's birthday", ad: '03-21', birthday: true}    every year on March 21
+  //   {name: 'Trip to Pokhara', date: '2026-12-20'}             once
+  events: [],
+
   // The apps on your home screen, in order, by LG app id. Leave empty to use the TV's own list.
   apps: []
 };

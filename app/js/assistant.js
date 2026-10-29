@@ -47,6 +47,7 @@ var Assistant = (function () {
       'Someone typed or dictated a request on their phone; your answer shows on the TV and goes back to the phone.',
       'It is ' + U.DAYS[now.getDay()] + ', ' + t.hm + ' ' + t.ampm + ' local time.'
         + (w ? ' Weather: ' + w.temp + '°, ' + w.kind + '.' : ''),
+      Calendar.summary(),
       'Streaming catalogue to think about: ' + (C.region || 'IN') + ' (country code).',
       'Apps on this TV:\n' + apps,
       '',

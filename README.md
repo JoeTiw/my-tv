@@ -2,7 +2,7 @@
 
 A glassy home screen for our LG TV, with a few things the TV can't do on its own:
 
-- **Glass home screen:** a big clock, the date, Kathmandu's weather, and frosted-glass app tiles that glow in each app's color.
+- **Glass home screen:** a big clock, the date and the Nepali date, Kathmandu's weather, festival and birthday countdowns, and frosted-glass app tiles that glow in each app's color.
 - **Notes from your phone,** from anywhere: they pop up on the TV, then wait in the corner for a day.
 - **Your own background:** send a photo (or a color) from your phone. Light and dark follow the sunset, or you choose.
 - **An assistant:** "Hey TV, open Netflix" or "Hey TV, something funny for the family tonight". It opens apps, or shows picks you open with OK. The answer comes back to your phone too.
@@ -35,6 +35,26 @@ It creates `app/config.js` for your settings, gets LG's tools, and asks for the 
 | `channel` | Your private phone channel (setup makes one and prints its link) | Keep it secret: anyone who knows it can send to the TV |
 | `claudeKey` | The assistant | console.anthropic.com → API keys. Set a monthly spending limit there: the key lives on the TV. |
 | `tmdbKey` | Posters on the assistant's picks (optional) | themoviedb.org → Settings → API |
+
+## The Nepali calendar
+
+Under the clock: today's Bikram Sambat date (in Devanagari too; `nepaliScript: false` for English letters only), and
+pills for what's coming in the next weeks: festivals, Nepali New Year, and your own days. On the day, the pill
+turns pink with a greeting ("Happy Tihar!", "Happy birthday, Ama!"). The assistant knows them too.
+
+Add birthdays and other days to `events` in `app/config.js`:
+
+```
+events: [
+  {name: "Ama's birthday", bs: '05-14', birthday: true},    // every year on Bhadra 14 (BS month-day)
+  {name: "Papa's birthday", ad: '03-21', birthday: true},   // every year on March 21
+  {name: 'Trip to Pokhara', date: '2026-12-20'}              // once
+],
+```
+
+The festival dates come from the government's list of public holidays for 2083 (until mid-April 2027); the 2084 list
+gets added when it's published, around April 2027. The BS month lengths (2080 to 2090) are from
+[nepali-date-converter](https://github.com/subeshb1/Nepali-Date) (MIT) and match every date in the 2083 list.
 
 ## Install (and after every change)
 
@@ -127,6 +147,7 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | `remote/index.html` | the phone's remote page (GitHub Pages) |
 | `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
+| `app/js/calendar.js` | the Nepali date, festivals, birthdays |
 | `app/js/platform.js` | the TV's apps and opening them (webOS Luna) |
 | `helper/helper.mjs` | the helper at home: volume, buttons, apps and notes while other apps play (lgtv2) |
 | `scripts/tv.sh` | setup, install, preview, the phone link, the helper and Developer Mode renewal |
