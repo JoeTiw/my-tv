@@ -5,6 +5,7 @@
 #   bash scripts/tv.sh install              # build the app and put it on the TV (every time you change something)
 #   bash scripts/tv.sh preview              # look at it in your computer's browser
 #   bash scripts/tv.sh autorenew            # keep Developer Mode from running out (renews by itself)
+#   bash scripts/tv.sh phone                # the link for your phone's remote page
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -101,6 +102,20 @@ PLIST
     launchctl load "$PLIST"
     echo "Automatic renewal is on: your Mac checks every hour and renews about every 25 days."
     echo "What it did: $STATE/renew.log  ·  To turn it off: bash scripts/tv.sh autorenew off"
+    ;;
+  phone)
+    config
+    origin="$(git remote get-url origin 2>/dev/null || true)"
+    owner="$(echo "$origin" | sed -n 's#.*github.com[:/]\([^/]*\)/.*#\1#p')"
+    repo="$(echo "$origin" | sed -n 's#.*github.com[:/][^/]*/\([^/.]*\).*#\1#p')"
+    channel="$(sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1)"
+    if [ -z "$owner" ] || [ -z "$repo" ]; then echo "This folder isn't linked to a GitHub repository." >&2; exit 1; fi
+    owner="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
+    echo "Open this on your phone (it's private: don't share it):"
+    echo
+    echo "  https://$owner.github.io/$repo/remote/#$channel"
+    echo
+    echo "Then Share > Add to Home Screen. (GitHub Pages must be on: repository Settings > Pages > main, / (root).)"
     ;;
   preview)
     config

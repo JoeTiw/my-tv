@@ -55,19 +55,30 @@ by day 33, a note on the TV and your phone asks you to press **EXTEND** in Devel
 
 ## Use it from your phone
 
-Open `https://ntfy.sh/<your channel>` in your phone's browser (add it to your home screen), or subscribe to the
-channel in the ntfy app. Then send:
+**The Tiwari TV remote page** (`remote/`) has buttons that open the TV's apps, a "Hey TV" box (with a mic where the
+phone's browser can listen), one-tap notes, photos, colors and the theme, and the TV's answers like a chat.
+
+1. Put the page online once: on github.com, open the repository's **Settings → Pages**, choose **Deploy from a
+   branch**, **main**, **/ (root)**, and save. (Pages is free for public repositories.)
+2. Get your private link: `bash scripts/tv.sh phone`. Open it on your phone, then **Share → Add to Home Screen**.
+   The channel is in the part after `#`, which never leaves your phone; the page remembers it and takes it out of
+   the address bar.
+
+The TV keeps a live connection to the channel, so what you send arrives in about a second.
+
+You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`):
 
 | Send | The TV |
 |---|---|
 | any text | shows it as a note |
 | a photo | makes it the background |
-| `Hey TV, ...` or `TV, ...` | asks the assistant (dictation works great) |
+| `Hey TV, ...` or `TV, ...` | asks the assistant |
+| `/open netflix` (an app id or name) | opens that app |
 | `/bg #ffb3c6` · `/bg <image link>` · `/bg off` | a color, a picture from the web, or the normal sky |
 | `/theme dark` · `light` · `auto` | the look |
 | `/clear` | takes the notes away |
 
-The TV checks every 15 seconds while Tiwari TV is open. Messages pass through ntfy.sh, a free public relay, and stay there for a few hours.
+Messages pass through ntfy.sh, a free public relay, and stay there for a few hours.
 
 ## On the TV
 
@@ -88,7 +99,8 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | File | What it does |
 |---|---|
 | `app/js/home.js` | clock, dock, focus and remote keys, day/night, background |
-| `app/js/inbox.js` | messages from the phone (ntfy.sh) |
+| `app/js/inbox.js` | messages from the phone (ntfy.sh, live) |
+| `remote/index.html` | the phone's remote page (GitHub Pages) |
 | `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
 | `app/js/platform.js` | the TV's apps and opening them (webOS Luna) |

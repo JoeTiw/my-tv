@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16112A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiwari TV">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Tiwari TV Remote</title>
+<style>
+  :root {
+    --bg: #16112A;
+    --ink: #FFFFFF;
+    --soft: rgba(255, 255, 255, 0.68);
+    --faint: rgba(255, 255, 255, 0.42);
+    --glass: rgba(255, 255, 255, 0.09);
+    --glass-strong: rgba(255, 255, 255, 0.16);
+    --rim: rgba(255, 255, 255, 0.16);
+    --pink: #FF7AA8;
+    --radius: 26px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font: 17px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 170, 140, 0.32), transparent 60%),
+      radial-gradient(100% 60% at 100% 30%, rgba(120, 150, 255, 0.28), transparent 60%),
+      linear-gradient(#1F1840, #16112A 55%, #241433);
+    background-attachment: fixed;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 28px);
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+
+  .glass {
+    background: var(--glass);
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 0 1px var(--rim), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    backdrop-filter: blur(24px) saturate(140%);
+  }
+
+  header { display: flex; align-items: center; gap: 12px; margin: 4px 4px 18px; }
+  header img { width: 42px; height: 42px; border-radius: 12px; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: -0.3px; flex: 1; }
+  .status { font-size: 13px; color: var(--soft); display: flex; align-items: center; gap: 7px; }
+  .status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #8E8E93; }
+  .status.live::before { background: #4CD964; box-shadow: 0 0 10px #4CD964; }
+
+  section { margin-bottom: 16px; padding: 18px; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.9px; text-transform: uppercase; color: var(--soft); margin: 0 0 12px 2px; }
+
+  /* Apps */
+  .apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .app {
+    position: relative;
+    height: 74px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 15px;
+    overflow: hidden;
+    background: var(--glass-strong);
+    box-shadow: inset 0 0 0 1px var(--rim), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    transition: transform 0.12s;
+  }
+  .app::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(100% 90% at 50% 125%, var(--c), transparent 72%);
+    opacity: 0.95;
+  }
+  .app span { position: relative; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); padding: 0 6px; }
+  .app:active, .chip:active, .round:active { transform: scale(0.95); }
+
+  /* Ask */
+  .ask { display: flex; gap: 8px; align-items: center; }
+  .field {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    border-radius: 20px;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 0 0 1px var(--rim);
+  }
+  .field::placeholder { color: var(--faint); }
+  textarea.field { width: 100%; resize: none; min-height: 84px; display: block; }
+  .round {
+    flex: none;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--glass-strong);
+    box-shadow: inset 0 0 0 1px var(--rim);
+    transition: transform 0.12s;
+  }
+  .round.go { background: var(--pink); box-shadow: 0 6px 20px rgba(255, 122, 168, 0.45); }
+  .round.listening { background: #FF3B30; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); } 0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.6); } }
+  .round svg { width: 22px; height: 22px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    padding: 9px 14px;
+    border-radius: 18px;
+    font-size: 15px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px var(--rim);
+    transition: transform 0.12s;
+  }
+
+  /* Conversation */
+  .feed { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; max-height: 340px; overflow-y: auto; }
+  .feed:empty { display: none; }
+  .bubble { max-width: 86%; padding: 10px 14px; border-radius: 20px; white-space: pre-wrap; word-wrap: break-word; font-size: 16px; }
+  .bubble.me { align-self: flex-end; background: var(--pink); color: #2A0E1C; border-bottom-right-radius: 6px; }
+  .bubble.tv { align-self: flex-start; background: rgba(255, 255, 255, 0.14); border-bottom-left-radius: 6px; }
+  .bubble small { display: block; font-size: 12px; opacity: 0.66; margin-top: 3px; }
+
+  /* Note */
+  .row { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+  .row .grow { flex: 1; font-size: 14px; color: var(--soft); }
+  .btn {
+    padding: 13px 20px;
+    border-radius: 18px;
+    font-weight: 600;
+    background: var(--glass-strong);
+    box-shadow: inset 0 0 0 1px var(--rim);
+  }
+  .btn.go { background: var(--pink); color: #2A0E1C; box-shadow: 0 6px 20px rgba(255, 122, 168, 0.35); }
+  .name { color: var(--ink); text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 3px; padding: 0; }
+
+  /* Look */
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 18px; background: rgba(0, 0, 0, 0.22); }
+  .seg button { padding: 10px 0; border-radius: 14px; font-weight: 600; color: var(--soft); }
+  .seg button.on { background: rgba(255, 255, 255, 0.18); color: var(--ink); }
+  .swatches { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .swatch { width: 40px; height: 40px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+  /* Setup */
+  .setup p { color: var(--soft); margin: 0 0 14px; }
+  .hidden { display: none !important; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 22px);
+    transform: translate(-50%, 20px);
+    opacity: 0;
+    padding: 12px 20px;
+    border-radius: 22px;
+    background: rgba(30, 24, 50, 0.92);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--rim);
+    font-size: 15px;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  footer { text-align: center; font-size: 13px; color: var(--faint); margin-top: 8px; }
+  footer button { color: var(--soft); text-decoration: underline; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon-192.png" alt="">
+    <h1>Tiwari TV</h1>
+    <div class="status" id="status">Connecting</div>
+  </header>
+
+  <section class="glass setup hidden" id="setup">
+    <h2>Connect to your TV</h2>
+    <p>Paste the phone link from setup on your Mac (it starts with https://ntfy.sh/tiwari-), or just the channel name.</p>
+    <input class="field" id="channelInput" placeholder="tiwari-…" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row"><span class="grow"></span><button class="btn go" id="channelSave">Connect</button></div>
+  </section>
+
+  <div id="ui" class="hidden">
+    <section class="glass">
+      <h2>Open on the TV</h2>
+      <div class="apps" id="apps"></div>
+    </section>
+
+    <section class="glass">
+      <h2>Ask Tiwari TV</h2>
+      <form class="ask" id="askForm">
+        <input class="field" id="askInput" placeholder="Hey TV, something funny tonight…" autocomplete="off" enterkeyhint="send">
+        <button type="button" class="round hidden" id="mic" aria-label="Speak">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <button type="submit" class="round go" aria-label="Ask">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2A0E1C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
+      <div class="chips" id="askChips"></div>
+      <div class="feed" id="feed"></div>
+    </section>
+
+    <section class="glass">
+      <h2>Leave a note</h2>
+      <textarea class="field" id="noteInput" placeholder="Dinner is in the fridge…" rows="3"></textarea>
+      <div class="chips" id="noteChips"></div>
+      <div class="row">
+        <span class="grow">From <button class="name" id="nameBtn"></button></span>
+        <button class="btn go" id="noteSend">Send to TV</button>
+      </div>
+    </section>
+
+    <section class="glass">
+      <h2>The look</h2>
+      <div class="seg" id="theme">
+        <button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button>
+      </div>
+      <div class="swatches" id="swatches"></div>
+      <div class="grid2">
+        <button class="btn" id="photoBtn">Send a photo</button>
+        <button class="btn" id="skyBtn">Back to the sky</button>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" class="hidden">
+      <div class="grid2"><button class="btn" id="clearBtn">Clear notes</button><span></span></div>
+    </section>
+
+    <footer>Messages go through ntfy.sh and stay there a few hours. · <button id="forget">Disconnect this phone</button></footer>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var NTFY = 'https://ntfy.sh/';
+  var DEFAULT_APPS = [
+    {id: 'netflix', title: 'Netflix', color: '#E50914'},
+    {id: 'youtube.leanback.v4', title: 'YouTube', color: '#FF0033'},
+    {id: 'amazon', title: 'Prime Video', color: '#1A98FF'},
+    {id: 'com.disney.disneyplus-prod', title: 'Disney+', color: '#1838C8'},
+    {id: 'com.webos.app.livetv', title: 'Live TV', color: '#FF8A3D'},
+    {id: 'spotify-beehive', title: 'Spotify', color: '#1DB954'}
+  ];
+  var ASKS = ['Something funny tonight', 'A good Nepali movie', 'Open YouTube', 'A show for the kids'];
+  var NOTES = ["Dinner's ready", 'On my way home', 'Call me when you can', 'Good night ❤️', 'Love you!'];
+  var COLORS = ['#FFB3C6', '#FFD6A5', '#CDEAC0', '#A0C4FF', '#BDB2FF', '#2B2D42'];
+
+  function $(id) { return document.getElementById(id); }
+  function store(k, v) { try { if (v === null) localStorage.removeItem('tiwari.' + k); else localStorage.setItem('tiwari.' + k, v); } catch (e) {} }
+  function stored(k) { try { return localStorage.getItem('tiwari.' + k); } catch (e) { return null; } }
+
+  var toastTimer;
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2200);
+  }
+  function buzz() { if (navigator.vibrate) navigator.vibrate(12); }
+
+  // MARK: - The channel: from the link's #, or typed once; kept on this phone only
+
+  function cleanChannel(s) {
+    s = String(s || '').trim();
+    var m = /ntfy\.sh\/([A-Za-z0-9_-]+)/.exec(s);
+    if (m) s = m[1];
+    s = s.replace(/^#/, '');
+    return /^[A-Za-z0-9_-]{8,64}$/.test(s) ? s : '';
+  }
+
+  var channel = cleanChannel(location.hash) || cleanChannel(stored('channel'));
+  if (location.hash) {
+    if (channel) store('channel', channel);
+    history.replaceState(null, '', location.pathname + location.search);   // the secret leaves the address bar
+  }
+
+  // MARK: - Sending
+
+  function send(text, opts) {
+    opts = opts || {};
+    var params = new URLSearchParams();
+    var name = stored('name');
+    if (name) params.set('title', name);
+    if (opts.filename) params.set('filename', opts.filename);
+    // A string or an untyped Blob keeps this a "simple" request: no CORS preflight.
+    return fetch(NTFY + encodeURIComponent(channel) + '?' + params.toString(), {method: 'POST', body: opts.blob || text})
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
+  }
+
+  function sent(what) { return function () { buzz(); toast(what); }; }
+  function failed() { toast("Couldn't reach the TV's channel. Check your internet."); }
+
+  // MARK: - Apps
+
+  function renderApps(list) {
+    var box = $('apps');
+    box.innerHTML = '';
+    list.forEach(function (a) {
+      var b = document.createElement('button');
+      b.className = 'app';
+      b.style.setProperty('--c', a.color || '#9A8CFF');
+      var s = document.createElement('span');
+      s.textContent = a.title;
+      b.appendChild(s);
+      b.onclick = function () { send('/open ' + a.id).then(sent('Opening ' + a.title + ' on the TV'), failed); };
+      box.appendChild(b);
+    });
+  }
+
+  function knownApps() {
+    try { var l = JSON.parse(stored('apps')); if (l && l.length) return l; } catch (e) {}
+    return DEFAULT_APPS;
+  }
+
+  // MARK: - Conversation
+
+  var feedIds = {};
+  function bubble(m, mine) {
+    if (feedIds[m.id]) return;
+    feedIds[m.id] = true;
+    var b = document.createElement('div');
+    b.className = 'bubble ' + (mine ? 'me' : 'tv');
+    b.textContent = mine ? m.message.replace(/^\s*hey[\s,]+tv[\s,:]*/i, '') : m.message;
+    var t = document.createElement('small');
+    var d = new Date(m.time * 1000);
+    t.textContent = (mine ? '' : 'Tiwari TV · ') + d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+    b.appendChild(t);
+    var feed = $('feed');
+    feed.appendChild(b);
+    while (feed.children.length > 30) feed.removeChild(feed.firstChild);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function ask(q) {
+    q = String(q || '').trim();
+    if (!q) return;
+    $('askInput').value = '';
+    send('Hey TV, ' + q).then(sent('Asked the TV'), failed);
+  }
+
+  // MARK: - Listening to the channel (the TV's answers and its app list)
+
+  var events = null;
+  function listen() {
+    if (events) events.close();
+    events = new EventSource(NTFY + encodeURIComponent(channel) + '/sse?since=12h');
+    events.onopen = function () { $('status').textContent = 'Connected'; $('status').classList.add('live'); };
+    events.onerror = function () { $('status').textContent = 'Reconnecting'; $('status').classList.remove('live'); };
+    events.onmessage = function (e) {
+      var m;
+      try { m = JSON.parse(e.data); } catch (err) { return; }
+      if (m.event !== 'message' || !m.message) return;
+      var tags = m.tags || [];
+      if (tags.indexOf('tiwari-apps') >= 0) {
+        try {
+          var list = JSON.parse(m.message);
+          if (list && list.length) { store('apps', JSON.stringify(list)); renderApps(list); }
+        } catch (err) {}
+        return;
+      }
+      if (tags.indexOf('tiwari-reply') >= 0) { bubble(m, false); return; }
+      if (/^\s*(hey[\s,]+tv|ok[\s,]+tv|tv)\s*[,:!.-]?\s+/i.test(m.message)) bubble(m, true);
+    };
+  }
+
+  // MARK: - Photos: made smaller on the phone first (the TV keeps a 1280×720 copy anyway)
+
+  function shrink(file, done) {
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      var max = 1920, s = Math.min(1, max / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function (b) { done(b); }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+    img.src = url;
+  }
+
+  // MARK: - Start
+
+  function showSetup() {
+    $('setup').classList.remove('hidden');
+    $('ui').classList.add('hidden');
+    $('status').textContent = 'Not connected';
+    $('status').classList.remove('live');
+  }
+
+  function start() {
+    $('setup').classList.add('hidden');
+    $('ui').classList.remove('hidden');
+    renderApps(knownApps());
+    $('nameBtn').textContent = stored('name') || 'add your name';
+    var t = stored('theme') || 'auto';
+    Array.prototype.forEach.call($('theme').children, function (b) { b.classList.toggle('on', b.dataset.t === t); });
+    listen();
+  }
+
+  $('channelSave').onclick = function () {
+    var c = cleanChannel($('channelInput').value);
+    if (!c) { toast("That doesn't look like a Tiwari TV channel"); return; }
+    channel = c;
+    store('channel', c);
+    start();
+  };
+
+  $('askForm').onsubmit = function (e) { e.preventDefault(); ask($('askInput').value); };
+  ASKS.forEach(function (q) {
+    var c = document.createElement('button');
+    c.className = 'chip';
+    c.textContent = q;
+    c.onclick = function () { ask(q); };
+    $('askChips').appendChild(c);
+  });
+
+  // Speaking: where the phone's browser can listen (Chrome on Android, Safari on iPhone).
+  var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (Speech) {
+    var mic = $('mic');
+    mic.classList.remove('hidden');
+    mic.onclick = function () {
+      var r = new Speech();
+      r.lang = stored('speechLang') || navigator.language || 'en-US';
+      r.interimResults = true;
+      mic.classList.add('listening');
+      r.onresult = function (e) {
+        var text = '';
+        for (var i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+        $('askInput').value = text;
+        if (e.results[e.results.length - 1].isFinal) ask(text);
+      };
+      r.onend = r.onerror = function () { mic.classList.remove('listening'); };
+      r.start();
+    };
+  }
+
+  NOTES.forEach(function (n) {
+    var c = document.createElement('button');
+    c.className = 'chip';
+    c.textContent = n;
+    c.onclick = function () { $('noteInput').value = n; $('noteInput').focus(); };
+    $('noteChips').appendChild(c);
+  });
+  $('noteSend').onclick = function () {
+    var text = $('noteInput').value.trim();
+    if (!text) { toast('Write a note first'); return; }
+    if (/^\s*(hey[\s,]+tv|tv)\b/i.test(text) || text.charAt(0) === '/') text = '​' + text;   // a note, never a command
+    send(text).then(function () { $('noteInput').value = ''; buzz(); toast('Note sent to the TV'); }, failed);
+  };
+  $('nameBtn').onclick = function () {
+    var n = prompt('Your name on notes (like Papa or Ama):', stored('name') || '');
+    if (n === null) return;
+    store('name', n.trim() || null);
+    $('nameBtn').textContent = n.trim() || 'add your name';
+  };
+
+  Array.prototype.forEach.call($('theme').children, function (b) {
+    b.onclick = function () {
+      store('theme', b.dataset.t);
+      Array.prototype.forEach.call($('theme').children, function (x) { x.classList.toggle('on', x === b); });
+      send('/theme ' + b.dataset.t).then(sent('Theme: ' + b.textContent), failed);
+    };
+  });
+  COLORS.forEach(function (c) {
+    var s = document.createElement('button');
+    s.className = 'swatch';
+    s.style.background = c;
+    s.setAttribute('aria-label', 'Background ' + c);
+    s.onclick = function () { send('/bg ' + c).then(sent('Background changed'), failed); };
+    $('swatches').appendChild(s);
+  });
+  $('skyBtn').onclick = function () { send('/bg off').then(sent('Back to the sky'), failed); };
+  $('clearBtn').onclick = function () { send('/clear').then(sent('Notes cleared'), failed); };
+  $('photoBtn').onclick = function () { $('photoInput').click(); };
+  $('photoInput').onchange = function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (!f) return;
+    toast('Sending the photo…');
+    shrink(f, function (jpeg) {
+      if (!jpeg) { toast("That photo couldn't be read"); return; }
+      send('', {blob: new Blob([jpeg]), filename: 'photo.jpg'}).then(sent('Photo sent: it’s the background now'), failed);
+    });
+  };
+  $('forget').onclick = function () {
+    if (!confirm('Disconnect this phone from the TV? You can paste the link again any time.')) return;
+    store('channel', null);
+    channel = '';
+    if (events) events.close();
+    showSetup();
+  };
+
+  if (channel) start(); else showSetup();
+})();
+</script>
+</body>
+</html>

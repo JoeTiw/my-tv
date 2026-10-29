@@ -193,6 +193,7 @@ var Home = (function () {
       TV.known().forEach(function (a) { colors[a.id] = a.color; });
       apps = list.map(function (a) { return {id: a.id, title: a.title, color: a.color || colors[a.id] || '#9A8CFF'}; });
       renderDock();
+      Inbox.announce();   // the phone page shows this TV's own apps
       if (done) done();
     });
   }

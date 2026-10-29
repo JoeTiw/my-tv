@@ -7,6 +7,7 @@
  *  - /bg <link> · /bg #ffb3c6 · /bg off
  *  - /theme dark · light · auto
  *  - /clear                       → takes the notes away
+ *  - /open <app id or name>       → opens that app (only when sent just now, never from a replay)
  *  - anything else                → a note: big for a moment, then small in the corner for a day
  */
 var Inbox = (function () {
@@ -92,7 +93,16 @@ var Inbox = (function () {
 
   var ASK = /^\s*(hey[\s,]+tv|ok[\s,]+tv|tv)\s*[,:!.-]?\s+/i;
 
-  function command(text) {
+  /** An app on the TV by id, or by name (part of it, any case). */
+  function findApp(q) {
+    var list = Home.apps(), low = q.toLowerCase(), i;
+    for (i = 0; i < list.length; i++) if (list[i].id === q) return list[i];
+    for (i = 0; i < list.length; i++) if (list[i].title.toLowerCase() === low) return list[i];
+    for (i = 0; i < list.length; i++) if (list[i].title.toLowerCase().indexOf(low) >= 0) return list[i];
+    return null;
+  }
+
+  function command(text, fresh) {
     var parts = text.replace(/^\s+|\s+$/g, '').split(/\s+/), name = parts[0].toLowerCase(), arg = parts.slice(1).join(' ');
     if (name === '/clear') { notes = []; big = null; U.save('notes', notes); render(); }
     else if (name === '/theme') { if (Home.setTheme(arg.toLowerCase())) Home.toast('Theme: ' + arg.toLowerCase()); }
@@ -101,17 +111,21 @@ var Inbox = (function () {
       else if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(arg)) Home.setWall({kind: 'color', color: arg});
       else if (/^https?:\/\/\S+$/i.test(arg)) keepPhoto(arg);
     }
+    else if (name === '/open' && fresh) {
+      var app = findApp(arg);
+      if (app) Home.open(app); else Home.toast('No app called ' + arg + ' on this TV');
+    }
   }
 
   /** One message. fresh: sent just now (not something replayed from while the TV was off). */
   function handle(m, fresh) {
-    if (m.tags && m.tags.indexOf(REPLY_TAG) >= 0) return;   // the TV's own answers
+    for (var t = 0; m.tags && t < m.tags.length; t++) if (String(m.tags[t]).indexOf('tiwari-') === 0) return;   // the TV's own
     var text = String(m.message || ''), a = m.attachment;
     if (a && a.url && /^image\//.test(a.type || '')) {
       keepPhoto(a.url);
       if (!text || text.indexOf('You received a file') === 0) return;   // what ntfy writes for a photo alone
     }
-    if (text.charAt(0) === '/') { command(text); return; }
+    if (text.charAt(0) === '/') { command(text, fresh); return; }
     if (ASK.test(text)) { if (fresh) Assistant.ask(text.replace(ASK, '')); return; }
     if (!text) return;
     var from = m.title && String(m.title).indexOf('ntfy.sh/') !== 0 ? String(m.title) : '';
@@ -127,18 +141,67 @@ var Inbox = (function () {
     U.http(BASE + '/json?poll=1&since=' + encodeURIComponent(lastId || '12h'), {timeout: 20000}, function (err, text) {
       polling = false;
       if (err) return;
-      var lines = String(text || '').split('\n'), msgs = [];
-      for (var i = 0; i < lines.length; i++) {
-        if (!lines[i]) continue;
-        try { var m = JSON.parse(lines[i]); if (m.event === 'message') msgs.push(m); } catch (e) {}
-      }
-      for (var j = 0; j < msgs.length; j++) {
-        handle(msgs[j], primed && Date.now() - msgs[j].time * 1000 < 10 * 60000);
-        lastId = msgs[j].id;
-      }
-      if (msgs.length) U.save('lastId', lastId);
+      take(String(text || '').split('\n'));
       primed = true;
     });
+  }
+
+  /** ntfy's lines (one JSON message each): handled in order, and the newest remembered. */
+  var seenIds = {}, seenOrder = [];   // the check and the live connection can both bring a message: once is enough
+
+  function take(lines) {
+    var got = false;
+    for (var i = 0; i < lines.length; i++) {
+      if (!lines[i]) continue;
+      var m;
+      try { m = JSON.parse(lines[i]); } catch (e) { continue; }
+      if (m.event !== 'message' || seenIds[m.id]) continue;
+      seenIds[m.id] = true;
+      seenOrder.push(m.id);
+      if (seenOrder.length > 200) delete seenIds[seenOrder.shift()];
+      handle(m, primed && Date.now() - m.time * 1000 < 10 * 60000);
+      lastId = m.id;
+      got = true;
+    }
+    if (got) U.save('lastId', lastId);
+  }
+
+  // MARK: - The live connection: messages arrive the moment they're sent
+
+  var STREAM_MS = 10 * 60000, streamFails = 0, streamXhr = null;
+
+  /**
+   * One long request that ntfy answers line by line as messages come. Opened again every 10 minutes (so the text
+   * it collects stays small) and after a drop; after 3 drops in a row the TV falls back to checking every 15 seconds.
+   */
+  function stream() {
+    if (!CH || document.hidden || streamXhr) return;
+    var xhr = new XMLHttpRequest(), seen = 0, opened = Date.now();
+    streamXhr = xhr;
+    xhr.open('GET', BASE + '/json?since=' + encodeURIComponent(lastId || '12h'));
+    xhr.onprogress = function () {
+      var text = xhr.responseText, end = text.lastIndexOf('\n');
+      if (end < seen) return;
+      take(text.slice(seen, end).split('\n'));
+      seen = end + 1;
+      primed = true;
+      streamFails = 0;
+    };
+    xhr.onloadend = function () {
+      streamXhr = null;
+      if (Date.now() - opened < 5000) streamFails++;
+      setTimeout(stream, streamFails ? Math.min(60000, 2000 * streamFails) : 500);
+    };
+    setTimeout(function () { if (streamXhr === xhr) xhr.abort(); }, STREAM_MS);
+    xhr.send();
+  }
+
+  /** Tells the phone page which apps this TV has (tagged, so the TV skips it). */
+  function announce() {
+    if (!CH) return;
+    var list = Home.apps().map(function (a) { return {id: a.id, title: a.title, color: a.color}; });
+    U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=tiwari-apps',
+      {method: 'POST', body: JSON.stringify(list), headers: {'Content-Type': 'text/plain'}}, function () {});
   }
 
   /** Sends the TV's answer back to the phone (tagged, so the TV skips it). Plain POST: no CORS preflight. */
@@ -152,13 +215,14 @@ var Inbox = (function () {
     render();
     if (!CH) return;
     poll();
-    setInterval(poll, POLL_MS);
+    stream();
+    setInterval(function () { if (streamFails >= 3) poll(); }, POLL_MS);   // the fallback
     setInterval(render, 10 * 60000);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { poll(); stream(); } });
   }
 
   return {
-    start: start, poll: poll, handle: handle, reply: reply, dismiss: dismiss, shrink: shrink,
+    start: start, poll: poll, handle: handle, reply: reply, announce: announce, dismiss: dismiss, shrink: shrink,
     bigShowing: function () { return !!big; }
   };
 })();
