@@ -30,7 +30,8 @@ const settings = JSON.parse(fs.readFileSync(path.join(STATE, 'helper.json'), 'ut
 // With the family's secret, everything on the channel is sealed (seal.mjs): only sealed messages are obeyed.
 const KEY = Seal.keyFrom(settings.secret);
 const pairing = process.argv.includes('--pair');
-const listing = process.argv.includes('--apps');   // a check-up: what the TV says about its apps' icons
+const listing = process.argv.includes('--apps');
+const saveTo = (process.argv.find((a) => a.indexOf('--save=') === 0) || '').slice(7);   // the check-up keeps the icons there   // a check-up: what the TV says about its apps' icons
 
 function log(...a) { console.log(new Date().toISOString().slice(0, 16).replace('T', ' '), ...a); }
 
@@ -340,6 +341,13 @@ async function checkApps() {
       const fields = ['largeIcon', 'mediumLargeIcon', 'icon', 'extraLargeIcon'].filter((f) => p[f]);
       const shown = fields.map((f) => f + '=' + String(p[f]).replace(/\/\/[0-9.]+(:\d+)?/, '//<tv>$1').slice(0, 70));
       const got = await fetchIcon(p);
+      if (saveTo && got.icon) {
+        const m = got.icon.match(/^data:image\/([a-z+]+);base64,(.*)$/);
+        if (m) {
+          fs.mkdirSync(saveTo, {recursive: true});
+          fs.writeFileSync(path.join(saveTo, String(p.title || p.id).replace(/[^\w .+-]/g, '_') + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1].replace('+xml', ''))), Buffer.from(m[2], 'base64'));
+        }
+      }
       console.log('  ' + (p.title || p.id).padEnd(22), got.icon ? ('icon OK ' + got.size).padEnd(19) : 'no icon: ' + got.why, '|', shown.join('  ') || '(none)');
     }
   } catch (err) { log('Could not list the TV\'s apps:', whyNot(err)); }

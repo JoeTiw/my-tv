@@ -8,7 +8,7 @@
 #   bash scripts/tv.sh phone                # the link for your phone's remote page
 #   bash scripts/tv.sh helper               # let this Mac control the TV for the phone (volume, buttons, apps)
 #   bash scripts/tv.sh lock                 # seal everything on your channel with a key (older setups)
-#   bash scripts/tv.sh apps                 # check-up: the TV's apps and whether their icons can be fetched
+#   bash scripts/tv.sh apps [save]          # check-up: the TV's apps, their icons' sizes (save: to the Desktop)
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -189,7 +189,12 @@ PLIST
     echo "The helper's last lines:"
     tail -n 8 "$STATE/helper.log" 2>/dev/null | sed -E 's/[0-9]{1,3}(\.[0-9]{1,3}){3}/<tv>/g; s/^/  /' || echo "  (no log yet)"
     echo
-    "$(command -v node)" "$STATE/helper/helper.mjs" --apps
+    if [ "${2:-}" = "save" ]; then
+      "$(command -v node)" "$STATE/helper/helper.mjs" --apps "--save=$HOME/Desktop/tiwari-icons"
+      echo; echo "The icons are in the folder tiwari-icons on your Desktop."
+    else
+      "$(command -v node)" "$STATE/helper/helper.mjs" --apps
+    fi
     ;;
   phone)
     config

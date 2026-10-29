@@ -86,7 +86,7 @@ var Home = (function () {
    * picture (nothing taken away), or an icon the TV won't let the page read.
    */
   // Lifting (and enlarging) takes the TV a moment: what came out is kept, by a short fingerprint of the icon.
-  var LIFT_VERSION = 5, kept = U.load('lifted');
+  var LIFT_VERSION = 7, kept = U.load('lifted');
   if (!kept || kept.v !== LIFT_VERSION) kept = {v: LIFT_VERSION, marks: {}};
   function print(src) {
     var h = 0;
@@ -123,7 +123,7 @@ var Home = (function () {
     c.width = w;
     c.height = h;
     var g = c.getContext('2d');
-    g.drawImage(img, 0, 0, w, h);
+    g.drawImage(w === img.naturalWidth ? img : toSize(img, w, h), 0, 0, w, h);   // a big icon: halved in steps
     var data = g.getImageData(0, 0, w, h), px = data.data;
     // The background: the most common color along a border set a little inside (icons often have round corners).
     var count = {}, best = null, bestN = 0, inset = Math.round(Math.min(w, h) * 0.06), n = 0;
@@ -243,8 +243,49 @@ var Home = (function () {
     crop.getContext('2d').drawImage(c, minX, minY, crop.width, crop.height, 0, 0, crop.width, crop.height);
     // A black or gray mark would vanish on smoky glass: it's shown white. A colored one (red letters) stays.
     var bgHex = best ? '#' + ((1 << 24) | (best[0] << 16) | (best[1] << 8) | best[2]).toString(16).slice(1) : '';
-    var big = enlarge(crop, 150, 86, true);   // a small icon's mark: made big enough for the tile, edges crisp
-    return {src: big.toDataURL('image/png'), w: crop.width, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+    // Made exactly the size it shows at on a focused tile (a small one enlarged first, edges crisp): the TV then
+    // never scales it itself, which on the TV skips rows and leaves lines through the letters.
+    var s = Math.min(LOGO_W * DENSITY / crop.width, LOGO_H * DENSITY / crop.height);
+    var tw = Math.max(1, Math.round(crop.width * s)), th = Math.max(1, Math.round(crop.height * s));
+    var out = toSize(enlarge(crop, tw, th, true), tw, th);
+    return {src: out.toDataURL('image/png'), w: crop.width, pw: tw, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+  }
+
+  // The logo's room on a focused tile (224 × 192): 66% of its width, 44% of its height.
+  var LOGO_W = 148, LOGO_H = 84, FOCUS_W = 224;
+  // Screen pixels for one of the layout's (1 on the TV; more if it draws finer): logos are made at that many.
+  var DENSITY = Math.max(1, Math.min(2, (window.devicePixelRatio || 1) * Math.min(window.innerWidth / 1920, window.innerHeight / 1080) || 1));
+
+  /** A picture made tw × th in steps of halves (each step averages 2 × 2 pixels), so nothing is skipped. */
+  function toSize(src, tw, th) {
+    var cur = src, w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+    if (w === tw && h === th && cur.getContext) return cur;
+    while (w / 2 >= tw && h / 2 >= th) {
+      var half = document.createElement('canvas');
+      half.width = Math.ceil(w / 2);
+      half.height = Math.ceil(h / 2);
+      var hg = half.getContext('2d');
+      hg.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in hg) hg.imageSmoothingQuality = 'high';
+      hg.drawImage(cur, 0, 0, w, h, 0, 0, half.width, half.height);
+      cur = half; w = half.width; h = half.height;
+    }
+    var c = document.createElement('canvas');
+    c.width = tw;
+    c.height = th;
+    var g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+    g.drawImage(cur, 0, 0, w, h, 0, 0, tw, th);
+    return c;
+  }
+
+  /** The logo's width on the tile, as a share of it: one pixel for one pixel when focused. */
+  function sizeLogo(img, mark) {
+    if (!mark.pw) return;
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    img.style.width = (mark.pw / DENSITY / FOCUS_W * 100).toFixed(2) + '%';
   }
 
   /** The symbol's box, when a wide mark is a colored symbol, a gap, then plain dark or gray letters; else null. */
@@ -266,7 +307,7 @@ var Home = (function () {
       return o;
     }
     // The first gap: empty columns, at least 3% of the width.
-    var need = Math.max(2, Math.round((maxX - minX) * 0.03)), run = 0, cut = -1;
+    var need = Math.max(1, Math.round((maxX - minX) * 0.012)), run = 0, cut = -1;
     for (var x = minX; x <= maxX && cut < 0; x++) {
       var empty = true;
       for (var y = minY; y <= maxY && empty; y++) if (px[(y * w + x) * 4 + 3] >= 90) empty = false;
@@ -328,8 +369,58 @@ var Home = (function () {
         px[j + 3] = Math.round(t * t * (3 - 2 * t) * 255);
       }
     }
+    if (crispEdges) flatColors(px, n);
     g.putImageData(data, 0, 0);
     return c;
+  }
+
+  /**
+   * A logo is a few flat colors (red, and white for the play sign). When that's so, a pixel between two of them
+   * (where enlarging blurred the line) is moved to the nearer one, gradually, so the line inside is crisp too.
+   */
+  function flatColors(px, n) {
+    var bins = {}, total = 0, i, j, key, b;
+    for (i = 0; i < n; i++) {
+      j = i * 4;
+      if (px[j + 3] < 250) continue;
+      key = (px[j] >> 4) * 256 + (px[j + 1] >> 4) * 16 + (px[j + 2] >> 4);
+      b = bins[key] || (bins[key] = {n: 0, r: 0, g: 0, b: 0});
+      b.n++; b.r += px[j]; b.g += px[j + 1]; b.b += px[j + 2];
+      total++;
+    }
+    if (total < 50) return;
+    var list = [];
+    for (key in bins) if (bins.hasOwnProperty(key)) list.push(bins[key]);
+    list.sort(function (x, y) { return y.n - x.n; });
+    var pal = [], got = 0;
+    for (i = 0; i < list.length && pal.length < 4; i++) {
+      var c = [list[i].r / list[i].n, list[i].g / list[i].n, list[i].b / list[i].n], same = false;
+      for (var q = 0; q < pal.length; q++) if (Math.abs(pal[q][0] - c[0]) + Math.abs(pal[q][1] - c[1]) + Math.abs(pal[q][2] - c[2]) < 40) same = true;
+      got += list[i].n;
+      if (!same) pal.push(c);
+      if (got >= total * 0.88) break;
+    }
+    if (got < total * 0.88 || pal.length < 2) return;   // shaded, or one color: nothing to tighten
+    for (i = 0; i < n; i++) {
+      j = i * 4;
+      if (!px[j + 3]) continue;
+      // The two nearest of the colors, and how far along from one to the other this pixel is.
+      var a = -1, a2 = -1, da = 1e9, da2 = 1e9;
+      for (q = 0; q < pal.length; q++) {
+        var d = (px[j] - pal[q][0]) * (px[j] - pal[q][0]) + (px[j + 1] - pal[q][1]) * (px[j + 1] - pal[q][1]) + (px[j + 2] - pal[q][2]) * (px[j + 2] - pal[q][2]);
+        if (d < da) { a2 = a; da2 = da; a = q; da = d; } else if (d < da2) { a2 = q; da2 = d; }
+      }
+      if (a2 < 0) continue;
+      var c1 = pal[a], c2 = pal[a2], vx = c2[0] - c1[0], vy = c2[1] - c1[1], vz = c2[2] - c1[2], len = vx * vx + vy * vy + vz * vz;
+      if (len < 1) continue;
+      var t = ((px[j] - c1[0]) * vx + (px[j + 1] - c1[1]) * vy + (px[j + 2] - c1[2]) * vz) / len;
+      // Far off the line between them: a color of its own (a small detail): left alone.
+      var ox = px[j] - c1[0] - t * vx, oy = px[j + 1] - c1[1] - t * vy, oz = px[j + 2] - c1[2] - t * vz;
+      if (ox * ox + oy * oy + oz * oz > len * 0.12) continue;
+      t = Math.max(0, Math.min(1, (t - 0.3) / 0.4));
+      t = t * t * (3 - 2 * t);
+      px[j] = Math.round(c1[0] + vx * t); px[j + 1] = Math.round(c1[1] + vy * t); px[j + 2] = Math.round(c1[2] + vz * t);
+    }
   }
 
   /** A box blur of radius r over a W×H channel, in place (across, then down). */
@@ -392,19 +483,21 @@ var Home = (function () {
             img.onload = function () {
               if (done) return;
               done = true;
-              if (img.naturalWidth >= 100) return;
-              try { var c = enlarge(img, 100, 100, false); if (c !== img) img.src = c.toDataURL('image/png'); } catch (e) {}
+              if (img.naturalWidth === 100) return;
+              // Exactly its 100 px place: a small one enlarged, a big one made smaller here rather than by the TV.
+              try { img.src = toSize(enlarge(img, 100, 100, false), 100, Math.round(100 * img.naturalHeight / img.naturalWidth)).toDataURL('image/png'); } catch (e) {}
             };
             img.src = src;
           }
           lift(src, function (mark) {
             if (!mark) { plain(); return; }
             var img = U.el('img', 'logo' + (mark.dark ? ' white' : ''), t);
+            sizeLogo(img, mark);
             img.src = mark.src;
             // An app we don't know: its icon's own color glows (Hulu's green), unless that's black or white.
             if (!known && mark.bg && colorfulHex(mark.bg)) glow(tint, mark.bg);
             // Sharper: the TV's own bigger icon file, if Tiwari TV may read it.
-            sharper(paths, mark.w, function (big) { img.className = 'logo' + (big.dark ? ' white' : ''); img.src = big.src; });
+            sharper(paths, mark.w, function (big) { img.className = 'logo' + (big.dark ? ' white' : ''); sizeLogo(img, big); img.src = big.src; });
           });
         })(t, word, a.icon, tint, !!knownColors[a.id], a.paths);
       }
