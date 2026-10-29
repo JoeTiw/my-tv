@@ -6,6 +6,7 @@
 #   bash scripts/tv.sh preview              # look at it in your computer's browser
 #   bash scripts/tv.sh autorenew            # keep Developer Mode from running out (renews by itself)
 #   bash scripts/tv.sh phone                # the link for your phone's remote page
+#   bash scripts/tv.sh helper               # let this Mac control the TV for the phone (volume, buttons, apps)
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -102,6 +103,48 @@ PLIST
     launchctl load "$PLIST"
     echo "Automatic renewal is on: your Mac checks every hour and renews about every 25 days."
     echo "What it did: $STATE/renew.log  ·  To turn it off: bash scripts/tv.sh autorenew off"
+    ;;
+  helper)
+    STATE="$HOME/.tiwari-tv"
+    PLIST="$HOME/Library/LaunchAgents/com.tiwari.tv.helper.plist"
+    if [ "${2:-}" = "off" ]; then
+      launchctl unload "$PLIST" 2>/dev/null || true
+      rm -f "$PLIST"
+      echo "The helper is off."
+      exit 0
+    fi
+    config
+    tools
+    ip="${2:-$(npx ares-setup-device -l 2>/dev/null | sed -n "s/^$DEVICE[^@]*@\([0-9.]*\):.*/\1/p" | head -n 1)}"
+    channel="$(sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1)"
+    if [ -z "$ip" ]; then echo "Run setup first (bash scripts/tv.sh setup <TV IP>), or: bash scripts/tv.sh helper <TV IP>" >&2; exit 1; fi
+    node="$(command -v node)"
+    mkdir -p "$STATE/helper"
+    cp helper/helper.mjs helper/package.json "$STATE/helper/"
+    printf '{"host": "%s", "channel": "%s"}\n' "$ip" "$channel" > "$STATE/helper.json"
+    echo "Getting the helper's TV library ..."
+    (cd "$STATE/helper" && npm install --silent --omit=dev)
+    echo "Pairing with the TV at $ip: the TV will ask to allow Tiwari TV Helper. Accept it with the remote."
+    "$node" "$STATE/helper/helper.mjs" --pair
+    mkdir -p "$(dirname "$PLIST")"
+    cat > "$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.tiwari.tv.helper</string>
+  <key>ProgramArguments</key><array><string>$node</string><string>$STATE/helper/helper.mjs</string></array>
+  <key>KeepAlive</key><true/>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$STATE/helper.log</string>
+  <key>StandardErrorPath</key><string>$STATE/helper.log</string>
+</dict>
+</plist>
+PLIST
+    launchctl unload "$PLIST" 2>/dev/null || true
+    launchctl load "$PLIST"
+    echo "The helper is on: volume, buttons and \"Back to Tiwari TV\" work from your phone while this Mac is awake."
+    echo "What it's doing: $STATE/helper.log  ·  To turn it off: bash scripts/tv.sh helper off"
     ;;
   phone)
     config

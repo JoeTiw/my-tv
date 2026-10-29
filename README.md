@@ -66,6 +66,27 @@ phone's browser can listen), one-tap notes, photos, colors and the theme, and th
 
 The TV keeps a live connection to the channel, so what you send arrives in about a second.
 
+### The helper at home: volume, buttons and more, even while Netflix is playing
+
+LG pauses Tiwari TV while another app is in front, so for the **Remote** buttons a computer at home does the work:
+it listens to your channel and talks to the TV over the home Wi-Fi (the same connection LG's ThinQ app uses).
+
+```
+bash scripts/tv.sh helper
+```
+
+Run it with the TV on: the TV asks once to allow **Tiwari TV Helper**; accept it with the remote. After that, while
+this Mac is awake and on the home Wi-Fi:
+
+- **Volume, mute, play, pause and back** from the phone, whatever is on screen;
+- **Tiwari TV** brings Tiwari TV back to the front (from YouTube, Netflix, anywhere);
+- the app buttons work while another app is open;
+- notes pop up as a small TV notification while someone's watching something else;
+- "Hey TV" while another app is open brings Tiwari TV forward to answer.
+
+`~/.tiwari-tv/helper.log` shows what it did; `bash scripts/tv.sh helper off` stops it. Without the helper, everything
+else still works; the phone page says when the helper isn't answering.
+
 You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`):
 
 | Send | The TV |
@@ -77,6 +98,9 @@ You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`)
 | `/bg #ffb3c6` · `/bg <image link>` · `/bg off` | a color, a picture from the web, or the normal sky |
 | `/theme dark` · `light` · `auto` | the look |
 | `/clear` | takes the notes away |
+| `/vol up` · `/vol down 3` · `/vol 20` · `/mute` | the volume (needs the helper) |
+| `/key play` · `pause` · `back` · `home` | a remote button (needs the helper) |
+| `/tiwari` | brings Tiwari TV to the front (needs the helper) |
 
 Messages pass through ntfy.sh, a free public relay, and stay there for a few hours.
 
@@ -104,4 +128,5 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
 | `app/js/platform.js` | the TV's apps and opening them (webOS Luna) |
-| `scripts/tv.sh` | setup, install and preview |
+| `helper/helper.mjs` | the helper at home: volume, buttons, apps and notes while other apps play (lgtv2) |
+| `scripts/tv.sh` | setup, install, preview, the phone link, the helper and Developer Mode renewal |

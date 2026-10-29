@@ -82,6 +82,30 @@
   .app span { position: relative; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); padding: 0 6px; }
   .app:active, .chip:active, .round:active { transform: scale(0.95); }
 
+  /* Remote */
+  .vol { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 10px; }
+  .vol button, .keys button {
+    height: 68px;
+    border-radius: 22px;
+    font-size: 26px;
+    font-weight: 600;
+    background: var(--glass-strong);
+    box-shadow: inset 0 0 0 1px var(--rim), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    transition: transform 0.1s, background 0.1s;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .vol button:active, .keys button:active { transform: scale(0.95); background: rgba(255, 255, 255, 0.24); }
+  .vol .mute { font-size: 16px; }
+  .vol .mute.on { background: var(--pink); color: #2A0E1C; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+  .keys button { height: 56px; font-size: 14px; }
+  .keys .home { background: rgba(255, 122, 168, 0.28); }
+  .level { margin-top: 12px; font-size: 14px; color: var(--soft); display: flex; align-items: center; gap: 10px; }
+  .bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--pink); transition: width 0.3s; }
+
   /* Ask */
   .ask { display: flex; gap: 8px; align-items: center; }
   .field {
@@ -190,6 +214,22 @@
   </section>
 
   <div id="ui" class="hidden">
+    <section class="glass">
+      <h2>Remote</h2>
+      <div class="vol">
+        <button id="volDown" aria-label="Volume down">−</button>
+        <button id="muteBtn" class="mute">Mute</button>
+        <button id="volUp" aria-label="Volume up">+</button>
+      </div>
+      <div class="keys">
+        <button data-key="play">Play</button>
+        <button data-key="pause">Pause</button>
+        <button data-key="back">Back</button>
+        <button class="home" id="tiwariBtn">Tiwari TV</button>
+      </div>
+      <div class="level"><span id="level">Checking the helper…</span><div class="bar"><i id="levelBar"></i></div></div>
+    </section>
+
     <section class="glass">
       <h2>Open on the TV</h2>
       <div class="apps" id="apps"></div>
@@ -370,9 +410,52 @@
         } catch (err) {}
         return;
       }
+      if (tags.indexOf('tiwari-status') >= 0) { try { helperStatus(JSON.parse(m.message)); } catch (err) {} return; }
       if (tags.indexOf('tiwari-reply') >= 0) { bubble(m, false); return; }
       if (/^\s*(hey[\s,]+tv|ok[\s,]+tv|tv)\s*[,:!.-]?\s+/i.test(m.message)) bubble(m, true);
     };
+  }
+
+  // MARK: - Remote: the helper at home (a Mac on the TV's Wi-Fi) does these, even while Netflix is playing
+
+  var helper = {seen: 0, asked: 0, muted: false}, helperTimer;
+  function helperStatus(st) {
+    if (!st || !st.helper) return;
+    helper.seen = Date.now();
+    helper.muted = !!st.muted;
+    $('muteBtn').classList.toggle('on', helper.muted);
+    $('muteBtn').textContent = helper.muted ? 'Muted' : 'Mute';
+    if (!st.tv) { $('level').textContent = 'The TV is off (or not on the Wi-Fi)'; $('levelBar').style.width = '0'; return; }
+    var v = typeof st.volume === 'number' && st.volume >= 0 ? st.volume : null;
+    $('level').textContent = helper.muted ? 'Muted' : v === null ? 'Volume: on the sound bar' : 'Volume ' + v;
+    $('levelBar').style.width = (v === null || helper.muted ? 0 : v) + '%';
+  }
+  function askHelper() {
+    helper.asked = Date.now();
+    send('/status').catch(function () {});
+    clearTimeout(helperTimer);
+    helperTimer = setTimeout(function () {
+      if (helper.seen < helper.asked) $('level').textContent = 'Volume and buttons need the helper on your Mac (bash scripts/tv.sh helper)';
+    }, 7000);
+  }
+
+  // Taps add up for a moment and go as one message (the free relay limits how fast a phone may send).
+  var volSteps = 0, volTimer;
+  function vol(d) {
+    buzz();
+    volSteps += d;
+    clearTimeout(volTimer);
+    volTimer = setTimeout(function () {
+      var n = volSteps;
+      volSteps = 0;
+      if (n) send('/vol ' + (n > 0 ? 'up ' : 'down ') + Math.min(10, Math.abs(n))).catch(failed);
+    }, 350);
+  }
+  function holdable(btn, d) {
+    var repeat;
+    function stop() { clearInterval(repeat); }
+    btn.addEventListener('pointerdown', function (e) { e.preventDefault(); vol(d); repeat = setInterval(function () { vol(d); }, 220); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { btn.addEventListener(t, stop); });
   }
 
   // MARK: - Photos: made smaller on the phone first (the TV keeps a 1280×720 copy anyway)
@@ -409,7 +492,10 @@
     var t = stored('theme') || 'auto';
     Array.prototype.forEach.call($('theme').children, function (b) { b.classList.toggle('on', b.dataset.t === t); });
     listen();
+    askHelper();
   }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && channel) askHelper(); });
 
   $('channelSave').onclick = function () {
     var c = cleanChannel($('channelInput').value);
@@ -418,6 +504,14 @@
     store('channel', c);
     start();
   };
+
+  holdable($('volUp'), 1);
+  holdable($('volDown'), -1);
+  $('muteBtn').onclick = function () { buzz(); send('/mute').catch(failed); };
+  Array.prototype.forEach.call(document.querySelectorAll('.keys [data-key]'), function (b) {
+    b.onclick = function () { buzz(); send('/key ' + b.dataset.key).catch(failed); };
+  });
+  $('tiwariBtn').onclick = function () { send('/tiwari').then(sent('Bringing Tiwari TV back'), failed); };
 
   $('askForm').onsubmit = function (e) { e.preventDefault(); ask($('askInput').value); };
   ASKS.forEach(function (q) {
