@@ -31,6 +31,9 @@ window.TIWARI = {
   //   {name: 'Trip to Pokhara', date: '2026-12-20'}             once
   events: [],
 
+  // The photo frame starts after this many quiet minutes (when it has photos).
+  frameAfter: 3,
+
   // The apps on your home screen, in order, by LG app id. Leave empty to use the TV's own list.
   apps: []
 };

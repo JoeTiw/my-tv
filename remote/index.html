@@ -175,6 +175,7 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 
   /* Setup */
+  .hint { color: var(--soft); font-size: 15px; margin: -4px 2px 4px; }
   .setup p { color: var(--soft); margin: 0 0 14px; }
   .hidden { display: none !important; }
 
@@ -274,6 +275,20 @@
       <div class="grid2"><button class="btn" id="clearBtn">Clear notes</button><span></span></div>
     </section>
 
+    <section class="glass">
+      <h2>Photo frame</h2>
+      <p class="hint">Photos you add here play on the TV, full screen, when nobody's used the remote for a few minutes.</p>
+      <div class="grid2">
+        <button class="btn go" id="frameAdd">Add photos</button>
+        <button class="btn" id="frameStart">Show it now</button>
+      </div>
+      <div class="grid2">
+        <button class="btn" id="frameStop">Stop</button>
+        <button class="btn" id="frameClear">Empty the frame</button>
+      </div>
+      <input type="file" id="frameInput" accept="image/*" multiple class="hidden">
+    </section>
+
     <footer>Messages go through ntfy.sh and stay there a few hours. · <button id="forget">Disconnect this phone</button></footer>
   </div>
 </main>
@@ -334,6 +349,7 @@
     var name = stored('name');
     if (name) params.set('title', name);
     if (opts.filename) params.set('filename', opts.filename);
+    if (opts.blob && text) params.set('message', text);   // words with a photo (like /frame) ride along
     // A string or an untyped Blob keeps this a "simple" request: no CORS preflight.
     return fetch(NTFY + encodeURIComponent(channel) + '?' + params.toString(), {method: 'POST', body: opts.blob || text})
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
@@ -591,6 +607,30 @@
       send('', {blob: new Blob([jpeg]), filename: 'photo.jpg'}).then(sent('Photo sent: it’s the background now'), failed);
     });
   };
+  // The photo frame: photos go one after another (the free relay doesn't like a burst).
+  $('frameAdd').onclick = function () { $('frameInput').click(); };
+  $('frameInput').onchange = function () {
+    var files = Array.prototype.slice.call(this.files || []);
+    this.value = '';
+    if (!files.length) return;
+    var i = 0, ok = 0;
+    (function next() {
+      if (i >= files.length) { buzz(); toast(ok ? 'Sent ' + ok + ' photo' + (ok > 1 ? 's' : '') + ' to the frame' : "The photos didn't go"); return; }
+      toast('Sending ' + (i + 1) + ' of ' + files.length + '…');
+      shrink(files[i++], function (jpeg) {
+        if (!jpeg) { next(); return; }
+        send('/frame', {blob: new Blob([jpeg]), filename: 'frame.jpg'})
+          .then(function () { ok++; setTimeout(next, 1200); }, function () { setTimeout(next, 1200); });
+      });
+    })();
+  };
+  $('frameStart').onclick = function () { send('/frame start').then(sent('Starting the photo frame'), failed); };
+  $('frameStop').onclick = function () { send('/frame stop').then(sent('Back to the home screen'), failed); };
+  $('frameClear').onclick = function () {
+    if (!confirm('Take all the photos out of the frame on the TV?')) return;
+    send('/frame clear').then(sent('The frame is empty'), failed);
+  };
+
   $('forget').onclick = function () {
     if (!confirm('Disconnect this phone from the TV? You can paste the link again any time.')) return;
     store('channel', null);

@@ -4,6 +4,7 @@ A glassy home screen for our LG TV, with a few things the TV can't do on its own
 
 - **Glass home screen:** a big clock, the date and the Nepali date, Kathmandu's weather, festival and birthday countdowns, and frosted-glass app tiles that glow in each app's color.
 - **Notes from your phone,** from anywhere: they pop up on the TV, then wait in the corner for a day.
+- **A family photo frame:** photos from your phones play full screen when nobody's using the TV.
 - **Your own background:** send a photo (or a color) from your phone. Light and dark follow the sunset, or you choose.
 - **An assistant:** "Hey TV, open Netflix" or "Hey TV, something funny for the family tonight". It opens apps, or shows picks you open with OK. The answer comes back to your phone too.
 
@@ -55,6 +56,18 @@ events: [
 The festival dates come from the government's list of public holidays for 2083 (until mid-April 2027); the 2084 list
 gets added when it's published, around April 2027. The BS month lengths (2080 to 2090) are from
 [nepali-date-converter](https://github.com/subeshb1/Nepali-Date) (MIT) and match every date in the 2083 list.
+
+## The photo frame
+
+On the phone page, **Photo frame → Add photos** (several at once). When nobody has touched the remote for a few
+minutes (`frameAfter` in `app/config.js`, 3 by default), Tiwari TV shows them full screen, one after another with a
+slow drift, the clock and the Nepali date on top, and who sent each one. Any button goes back to the home screen.
+**Show it now**, **Stop** and **Empty the frame** do what they say; from ntfy, send a photo with the words `/frame`.
+
+The TV keeps its own copies (up to 60; the oldest go first), but ntfy deletes files after a few hours, so the TV
+needs Tiwari TV open within that time to pick new photos up. While the frame shows, Tiwari TV asks LG's own
+screensaver to wait, the way Kodi does; if your TV still brings its screensaver, turn it off or lengthen it in the
+TV's settings (on many models: Settings → General → OLED Care or Screen Saver).
 
 ## Install (and after every change)
 
@@ -148,6 +161,7 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
 | `app/js/calendar.js` | the Nepali date, festivals, birthdays |
+| `app/js/frame.js` | the photo frame |
 | `app/js/platform.js` | the TV's apps and opening them (webOS Luna) |
 | `helper/helper.mjs` | the helper at home: volume, buttons, apps and notes while other apps play (lgtv2) |
 | `scripts/tv.sh` | setup, install, preview, the phone link, the helper and Developer Mode renewal |

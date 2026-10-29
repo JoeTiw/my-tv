@@ -8,6 +8,8 @@
  *  - /theme dark · light · auto
  *  - /clear                       → takes the notes away
  *  - /open <app id or name>       → opens that app (only when sent just now, never from a replay)
+ *  - a photo with "/frame"        → into the photo frame (shown after a few quiet minutes)
+ *  - /frame start · stop · clear  → the frame now, back to home, or no more photos in it
  *  - anything else                → a note: big for a moment, then small in the corner for a day
  */
 var Inbox = (function () {
@@ -111,6 +113,11 @@ var Inbox = (function () {
       else if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(arg)) Home.setWall({kind: 'color', color: arg});
       else if (/^https?:\/\/\S+$/i.test(arg)) keepPhoto(arg);
     }
+    else if (name === '/frame') {
+      if (arg === 'clear') { Frame.clear(); reply('The photo frame is empty now.'); }
+      else if (arg === 'stop') Frame.stop();
+      else if (arg === 'start' && fresh && !Frame.start()) reply('There are no photos in the frame yet.');
+    }
     else if (name === '/open' && fresh) {
       var app = findApp(arg);
       if (app) Home.open(app); else Home.toast('No app called ' + arg + ' on this TV');
@@ -121,6 +128,10 @@ var Inbox = (function () {
   function handle(m, fresh) {
     for (var t = 0; m.tags && t < m.tags.length; t++) if (String(m.tags[t]).indexOf('tiwari-') === 0) return;   // the TV's own
     var text = String(m.message || ''), a = m.attachment;
+    if (a && a.url && /^image\//.test(a.type || '') && /^\s*\/frame\b/i.test(text)) {
+      framePhoto(a.url, m);
+      return;
+    }
     if (a && a.url && /^image\//.test(a.type || '')) {
       keepPhoto(a.url);
       if (!text || text.indexOf('You received a file') === 0) return;   // what ntfy writes for a photo alone
@@ -202,6 +213,22 @@ var Inbox = (function () {
     var list = Home.apps().map(function (a) { return {id: a.id, title: a.title, color: a.color}; });
     U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=tiwari-apps',
       {method: 'POST', body: JSON.stringify(list), headers: {'Content-Type': 'text/plain'}}, function () {});
+  }
+
+  // Photos for the frame: kept one by one; one answer to the phone when a batch is in.
+  var added = 0, missed = 0, addedTimer = 0;
+  function framePhoto(url, m) {
+    var from = m.title && String(m.title).indexOf('ntfy.sh/') !== 0 ? String(m.title) : '';
+    Frame.add(url, from, (m.time || 0) * 1000 || Date.now(), function (ok) {
+      if (ok) added++; else missed++;
+      clearTimeout(addedTimer);
+      addedTimer = setTimeout(function () {
+        var text = (added ? 'Added ' + added + ' photo' + (added > 1 ? 's' : '') + ' to the frame (' + Frame.count() + ' in it).' : '')
+          + (missed ? ' ' + missed + " couldn't be picked up (ntfy keeps photos only a few hours)." : '');
+        added = missed = 0;
+        if (text) { reply(text.replace(/^ /, '')); Home.toast(text.replace(/^ /, '').split(' (')[0]); }
+      }, 4000);
+    });
   }
 
   /** Sends the TV's answer back to the phone (tagged, so the TV skips it). Plain POST: no CORS preflight. */

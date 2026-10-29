@@ -66,5 +66,36 @@ var TV = (function () {
     luna('luna://com.webos.applicationManager/launch', {id: id}, function (err) { done(err); });
   }
 
-  return {onTV: onTV, keys: keys, apps: apps, launch: launch, known: known, launched: [], _bridges: []};
+  /**
+   * Holds off LG's own screensaver while the photo frame shows, the way Kodi does: subscribe to the TV's power
+   * service and answer each screensaver request with "not now". LG doesn't promise this for every TV; where it's
+   * refused, LG's screensaver comes as usual.
+   */
+  var saverBridge = null;
+  function holdScreenSaver(hold) {
+    if (!onTV) { TV.holding = hold; return; }
+    if (!hold) {
+      if (saverBridge) { try { saverBridge.cancel(); } catch (e) {} saverBridge = null; }
+      return;
+    }
+    if (saverBridge) return;
+    var name = 'com.tiwari.tv';
+    saverBridge = new window.PalmServiceBridge();
+    saverBridge.onservicecallback = function (msg) {
+      var reply;
+      try { reply = JSON.parse(msg); } catch (e) { return; }
+      if (reply && reply.timestamp !== undefined) {
+        var answer = new window.PalmServiceBridge();
+        TV._bridges.push(answer);
+        if (TV._bridges.length > 20) TV._bridges.splice(0, 10);
+        answer.call('luna://com.webos.service.tvpower/power/responseScreenSaverRequest',
+          JSON.stringify({clientName: name, ack: false, timestamp: reply.timestamp}));
+      }
+    };
+    saverBridge.call('luna://com.webos.service.tvpower/power/registerScreenSaverRequest',
+      JSON.stringify({subscribe: true, clientName: name}));
+  }
+
+  return {onTV: onTV, keys: keys, apps: apps, launch: launch, known: known, holdScreenSaver: holdScreenSaver,
+    launched: [], holding: false, _bridges: []};
 })();

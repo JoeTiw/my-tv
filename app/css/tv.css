@@ -218,6 +218,32 @@ body {
 #assistant .hint { margin-top: 18px; font-size: 21px; opacity: 0.62; }
 #assistant .hint:empty { display: none; }
 
+/* MARK: - The photo frame */
+
+#notes { z-index: 9; }
+#frame { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 8; background: #000; opacity: 0; visibility: hidden; -webkit-transition: opacity 1.2s, visibility 0s 1.2s; transition: opacity 1.2s, visibility 0s 1.2s; }
+.framing #frame { opacity: 1; visibility: visible; -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
+#frame .slide { position: absolute; left: -3%; top: -3%; width: 106%; height: 106%; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 2s; transition: opacity 2s; }
+#frame .slide.on { opacity: 1; }
+#frame .drift0 { -webkit-animation: drift0 14s linear forwards; animation: drift0 14s linear forwards; }
+#frame .drift1 { -webkit-animation: drift1 14s linear forwards; animation: drift1 14s linear forwards; }
+#frame .drift2 { -webkit-animation: drift2 14s linear forwards; animation: drift2 14s linear forwards; }
+#frame .drift3 { -webkit-animation: drift3 14s linear forwards; animation: drift3 14s linear forwards; }
+@-webkit-keyframes drift0 { from { -webkit-transform: scale(1) translate(0, 0); } to { -webkit-transform: scale(1.06) translate(-1%, -1%); } }
+@keyframes drift0 { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.06) translate(-1%, -1%); } }
+@-webkit-keyframes drift1 { from { -webkit-transform: scale(1.06) translate(1%, 0); } to { -webkit-transform: scale(1) translate(0, 0); } }
+@keyframes drift1 { from { transform: scale(1.06) translate(1%, 0); } to { transform: scale(1) translate(0, 0); } }
+@-webkit-keyframes drift2 { from { -webkit-transform: scale(1) translate(1%, 1%); } to { -webkit-transform: scale(1.06) translate(0, 0); } }
+@keyframes drift2 { from { transform: scale(1) translate(1%, 1%); } to { transform: scale(1.06) translate(0, 0); } }
+@-webkit-keyframes drift3 { from { -webkit-transform: scale(1.05) translate(0, 1%); } to { -webkit-transform: scale(1.01) translate(-1%, 0); } }
+@keyframes drift3 { from { transform: scale(1.05) translate(0, 1%); } to { transform: scale(1.01) translate(-1%, 0); } }
+#frame:after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: -webkit-linear-gradient(top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.45)); background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.45)); }
+#frame .info { position: absolute; left: 80px; bottom: 76px; padding: 26px 40px 28px 36px; border-radius: 40px; z-index: 1; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.25); }
+#frame .clock { font-size: 110px; font-weight: 200; letter-spacing: -3px; line-height: 1; }
+#frame .clock span { font-size: 30px; letter-spacing: 0; margin-left: 10px; vertical-align: 62px; opacity: 0.85; }
+#frame .date { font-size: 30px; margin-top: 10px; opacity: 0.92; }
+#frame .caption { position: absolute; right: 84px; bottom: 84px; font-size: 26px; font-weight: 500; z-index: 1; opacity: 0.85; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6); }
+
 /* MARK: - Toast */
 
 #toast {
