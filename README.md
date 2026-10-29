@@ -162,6 +162,9 @@ this Mac is awake and on the home Wi-Fi:
   shows each app, where the TV keeps its icon, and whether the helper could fetch it, with the TV's address hidden.
   Newer LG firmware won't show the helper's main pairing the list of apps (`401 insufficient permissions`), so the
   helper pairs a second time, only to read that list: `bash scripts/tv.sh helper` asks the TV once more; press Accept.
+- **a background photo**: "Background photo" on the phone (any photo, 4K too) or a picture's link. The phone fits it to
+  1920 × 1080, the most an LG app draws (the TV scales the whole screen to its panel), and the TV keeps it in its
+  own database.
 - **your order for the apps**: hold OK on a tile to pick it up, ◀ ▶ to carry it, OK to put it down. Or on the phone,
   Arrange on "Open on the TV", then tap the left or right side of an app. New apps join at the end.
 

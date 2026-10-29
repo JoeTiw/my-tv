@@ -53,7 +53,42 @@ var Home = (function () {
     U.cls(body, 'has-photo', !!w);
   }
 
-  function setWall(w) { U.save('wall', w); showWall(w); }
+  // A full-size photo (a megabyte or so) lives in the TV's own database, not with the settings, which have little room.
+  var wallDb = null;
+  function wallStore(done) {
+    if (wallDb || !window.indexedDB) { done(wallDb); return; }
+    try {
+      var req = indexedDB.open('tiwari-wall', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('wall'); };
+      req.onsuccess = function () { wallDb = req.result; done(wallDb); };
+      req.onerror = function () { done(null); };
+    } catch (e) { done(null); }
+  }
+
+  function setWall(w) {
+    showWall(w);
+    if (w && w.kind === 'image' && /^data:/.test(w.src)) {
+      var at = Date.now();
+      wallStore(function (db) {
+        if (!db) { U.save('wall', w); return; }   // no database: the settings, if there's room
+        db.transaction('wall', 'readwrite').objectStore('wall').put(w.src, 'photo');
+        U.save('wall', {kind: 'image', kept: at});
+      });
+      return;
+    }
+    U.save('wall', w);
+  }
+
+  /** The background kept: from the settings, or the photo from the database. */
+  function loadWall() {
+    var w = U.load('wall');
+    if (!w || !w.kept) { showWall(w); return; }
+    wallStore(function (db) {
+      if (!db) return;
+      var get = db.transaction('wall', 'readonly').objectStore('wall').get('photo');
+      get.onsuccess = function () { if (get.result) showWall({kind: 'image', src: get.result}); };
+    });
+  }
 
   // MARK: - The dock
 
@@ -741,7 +776,7 @@ var Home = (function () {
   function start() {
     fit();
     window.addEventListener('resize', fit);
-    showWall(U.load('wall'));
+    loadWall();
     tick();
     setInterval(tick, 10000);
     weather();

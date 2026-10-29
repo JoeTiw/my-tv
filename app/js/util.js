@@ -94,6 +94,29 @@ var U = (function () {
   }
   function longDate(d) { return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate(); }
 
+  /**
+   * A picture made to fill W × H exactly (its middle, cut to that shape), made smaller in steps of halves so every
+   * pixel counts (one big step skips rows: fine detail shimmers on the TV). A canvas.
+   */
+  function cover(img, W, H) {
+    var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    var s = Math.max(W / iw, H / ih), cw = W / s, ch = H / s, sx = (iw - cw) / 2, sy = (ih - ch) / 2;
+    var cur = img, w = cw, h = ch;
+    function pen(c) { var g = c.getContext('2d'); g.imageSmoothingEnabled = true; if ('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high'; return g; }
+    while (w / 2 >= W && h / 2 >= H) {
+      var half = document.createElement('canvas');
+      half.width = Math.round(w / 2);
+      half.height = Math.round(h / 2);
+      pen(half).drawImage(cur, sx, sy, w, h, 0, 0, half.width, half.height);
+      cur = half; sx = 0; sy = 0; w = half.width; h = half.height;
+    }
+    var c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    pen(c).drawImage(cur, sx, sy, w, h, 0, 0, W, H);
+    return c;
+  }
+
   return {$: $, el: el, has: has, cls: cls, save: save, load: load, http: http, time: time, longDate: longDate, DAYS: DAYS,
-    now: now, at: at, zoneMinutes: zoneMinutes};
+    now: now, at: at, zoneMinutes: zoneMinutes, cover: cover};
 })();

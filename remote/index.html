@@ -282,10 +282,15 @@
       </div>
       <div class="swatches" id="swatches"></div>
       <div class="grid2">
-        <button class="btn" id="photoBtn">Send a photo</button>
+        <button class="btn" id="photoBtn">Background photo</button>
         <button class="btn" id="skyBtn">Back to the sky</button>
       </div>
       <input type="file" id="photoInput" accept="image/*" class="hidden">
+      <div class="row" style="margin-top: 10px">
+        <input class="field" id="wallLink" type="url" inputmode="url" style="flex: 1; min-width: 0" placeholder="Or a picture&#39;s link (https://…)">
+        <button class="btn" id="wallLinkBtn">Use</button>
+      </div>
+      <p class="hint">Any photo, 4K too: your phone fits it to the TV's full 1920 × 1080, and the TV keeps it.</p>
       <div class="grid2"><button class="btn" id="clearBtn">Clear notes</button><span></span></div>
     </section>
 
@@ -550,7 +555,33 @@
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { btn.addEventListener(t, stop); });
   }
 
-  // MARK: - Photos: made smaller on the phone first (the TV keeps a 1280×720 copy anyway)
+  // MARK: - Photos: made smaller on the phone first
+
+  /** A background: exactly 1920 × 1080 (its middle), made smaller in halves (crisp), a high-quality JPEG. */
+  function wallShrink(file, done) {
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var W = 1920, H = 1080, iw = img.naturalWidth, ih = img.naturalHeight;
+      var s = Math.max(W / iw, H / ih), cw = W / s, ch = H / s, sx = (iw - cw) / 2, sy = (ih - ch) / 2;
+      var cur = img, w = cw, h = ch;
+      function pen(c) { var g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return g; }
+      while (w / 2 >= W && h / 2 >= H) {
+        var half = document.createElement('canvas');
+        half.width = Math.round(w / 2);
+        half.height = Math.round(h / 2);
+        pen(half).drawImage(cur, sx, sy, w, h, 0, 0, half.width, half.height);
+        cur = half; sx = 0; sy = 0; w = half.width; h = half.height;
+      }
+      var c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      pen(c).drawImage(cur, sx, sy, w, h, 0, 0, W, H);
+      c.toBlob(function (b) { done(b); }, 'image/jpeg', 0.93);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+    img.src = url;
+  }
 
   function shrink(file, done) {
     var img = new Image(), url = URL.createObjectURL(file);
@@ -683,6 +714,11 @@
     $('swatches').appendChild(s);
   });
   $('skyBtn').onclick = function () { send('/bg off').then(sent('Back to the sky'), failed); };
+  $('wallLinkBtn').onclick = function () {
+    var link = $('wallLink').value.replace(/^\s+|\s+$/g, '');
+    if (!/^https:\/\/\S+$/i.test(link)) { toast('That needs to be a link starting with https://'); return; }
+    send('/bg ' + link).then(function () { $('wallLink').value = ''; sent('Background changed')(); }, failed);
+  };
   $('clearBtn').onclick = function () { send('/clear').then(sent('Notes cleared'), failed); };
   $('photoBtn').onclick = function () { $('photoInput').click(); };
   $('photoInput').onchange = function () {
@@ -690,7 +726,7 @@
     this.value = '';
     if (!f) return;
     toast('Sending the photo…');
-    shrink(f, function (jpeg) {
+    wallShrink(f, function (jpeg) {
       if (!jpeg) { toast("That photo couldn't be read"); return; }
       send('', {blob: new Blob([jpeg]), filename: 'photo.jpg'}).then(sent('Photo sent: it’s the background now'), failed);
     });

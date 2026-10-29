@@ -70,8 +70,9 @@ var Inbox = (function () {
   // MARK: - Photos
 
   /**
-   * The background, from a link (shown at once, then kept) or from the photo itself (a Blob): kept on the TV as a
-   * 1280×720 JPEG, since ntfy deletes files after a few hours.
+   * The background, from a link (shown at once, then kept) or from the photo itself (a Blob): kept on the TV at
+   * the screen's full 1920 × 1080 (as sent, when the phone already made it that), since ntfy deletes files after a
+   * few hours.
    */
   function keepPhoto(src) {
     var url = typeof src === 'string' ? src : null;
@@ -84,14 +85,11 @@ var Inbox = (function () {
         var img = new Image();
         img.onload = function () {
           try {
-            var c = document.createElement('canvas'), W = 1280, H = 720;
-            c.width = W;
-            c.height = H;
-            var s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
-            c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+            var exact = img.width === 1920 && img.height === 1080 && /^data:image\/jpeg/.test(reader.result);
+            var data = exact ? reader.result : U.cover(img, 1920, 1080).toDataURL('image/jpeg', 0.93);
             var now = U.load('wall');
-            if (!url || (now && now.src === url)) Home.setWall({kind: 'image', src: c.toDataURL('image/jpeg', 0.84)});
-          } catch (e) {}   // no room, or the browser won't let us read it: the link stays
+            if (!url || (now && now.src === url)) Home.setWall({kind: 'image', src: data});
+          } catch (e) {}   // the browser won't let us read it: the link stays
         };
         img.src = reader.result;
       };
@@ -189,8 +187,12 @@ var Inbox = (function () {
     var photo = a && a.url && (m.kind ? m.kind === 'photo' : /^image\//.test(a.type || ''));
     if (photo && /^\s*\/frame\b/i.test(text)) { framePhoto(m); return; }
     if (photo) {
-      if (m.kind) file(m, 'blob', function (blob) { if (blob) keepPhoto(blob); });
-      else keepPhoto(a.url);
+      // Once per photo: a restart replays the last hours, and the background is kept already.
+      if (!m.id || U.load('wallMsg') !== m.id) {
+        if (m.id) U.save('wallMsg', m.id);
+        if (m.kind) file(m, 'blob', function (blob) { if (blob) keepPhoto(blob); });
+        else keepPhoto(a.url);
+      }
       if (!text || text.indexOf('You received a file') === 0) return;   // what ntfy writes for a photo alone
     }
     if (text.charAt(0) === '/') { command(text, fresh, (m.time || 0) * 1000 || Date.now()); return; }
