@@ -1,0 +1,218 @@
+/*
+ * Tiwari TV. One 1920×1080 stage (scaled to the window in a desktop preview).
+ * Written for older LG TVs too: no CSS variables or grid; real blur only where the TV has backdrop-filter.
+ */
+
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0B0A12; }
+body {
+  font-family: "LG Smart UI", "Museo Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #FFF;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+
+/* MARK: - Sky: a soft gradient with two slow lights, or the photo sent from the phone */
+
+#sky, #sky > div { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+#sky {
+  background: #6E5A9E;
+  background: -webkit-linear-gradient(top, #8C7BC4 0%, #C38FB4 52%, #F0B69A 100%);
+  background: linear-gradient(#8C7BC4 0%, #C38FB4 52%, #F0B69A 100%);
+  -webkit-transition: background 2s;
+  transition: background 2s;
+}
+.night #sky {
+  background: #14112A;
+  background: -webkit-linear-gradient(top, #0E0D22 0%, #1F1840 55%, #3A2346 100%);
+  background: linear-gradient(#0E0D22 0%, #1F1840 55%, #3A2346 100%);
+}
+#sky .glow { width: 1100px; height: 1100px; border-radius: 50%; opacity: 0.55; }
+#sky .glow.a {
+  left: -260px; top: -380px;
+  background: -webkit-radial-gradient(center, circle, rgba(255, 214, 170, 0.9), rgba(255, 214, 170, 0) 65%);
+  background: radial-gradient(circle, rgba(255, 214, 170, 0.9), rgba(255, 214, 170, 0) 65%);
+  -webkit-animation: drift-a 40s ease-in-out infinite alternate;
+  animation: drift-a 40s ease-in-out infinite alternate;
+}
+#sky .glow.b {
+  left: 1080px; top: 340px;
+  background: -webkit-radial-gradient(center, circle, rgba(130, 170, 255, 0.8), rgba(130, 170, 255, 0) 65%);
+  background: radial-gradient(circle, rgba(130, 170, 255, 0.8), rgba(130, 170, 255, 0) 65%);
+  -webkit-animation: drift-b 52s ease-in-out infinite alternate;
+  animation: drift-b 52s ease-in-out infinite alternate;
+}
+.night #sky .glow { opacity: 0.32; }
+@-webkit-keyframes drift-a { from { -webkit-transform: translate(0, 0); } to { -webkit-transform: translate(260px, 120px); } }
+@keyframes drift-a { from { transform: translate(0, 0); } to { transform: translate(260px, 120px); } }
+@-webkit-keyframes drift-b { from { -webkit-transform: translate(0, 0); } to { -webkit-transform: translate(-300px, -160px); } }
+@keyframes drift-b { from { transform: translate(0, 0); } to { transform: translate(-300px, -160px); } }
+
+#photo { background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
+.has-photo #photo { opacity: 1; }
+.has-photo #sky .glow { display: none; }
+#sky .shade {
+  background: -webkit-linear-gradient(top, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.42));
+  background: linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.42));
+}
+.night #sky .shade { background-color: rgba(0, 0, 0, 0.18); }
+
+/* MARK: - Glass: tinted on every TV, truly frosted where the TV can blur */
+
+.glass {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.26), inset 0 2px 0 rgba(255, 255, 255, 0.45), 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+.night .glass { background: rgba(255, 255, 255, 0.1); }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass { -webkit-backdrop-filter: blur(28px) saturate(150%); backdrop-filter: blur(28px) saturate(150%); }
+}
+
+/* MARK: - Clock, date, weather */
+
+#now { position: absolute; left: 96px; top: 70px; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.18); }
+#clock { font-size: 200px; font-weight: 200; letter-spacing: -6px; line-height: 1; }
+#clock .ampm { font-size: 44px; font-weight: 400; letter-spacing: 0; margin-left: 14px; vertical-align: 118px; opacity: 0.85; }
+#date { font-size: 46px; font-weight: 400; margin-top: 6px; opacity: 0.92; }
+.pill { display: inline-block; margin-top: 30px; padding: 16px 30px 16px 22px; border-radius: 40px; font-size: 30px; white-space: nowrap; }
+#weather { visibility: hidden; text-shadow: none; }
+#weather.on { visibility: visible; }
+#weather svg { width: 40px; height: 40px; vertical-align: -9px; margin-right: 12px; }
+#weather b { font-weight: 600; margin-right: 14px; }
+#weather .soft { opacity: 0.78; }
+
+/* MARK: - The dock: glass tiles, each app's color glowing up from the bottom */
+
+#dock { position: absolute; left: 0; right: 0; bottom: 84px; height: 250px; }
+#apps { position: absolute; left: 0; top: 0; height: 250px; white-space: nowrap; -webkit-transition: -webkit-transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.tile {
+  position: absolute;
+  top: 40px;
+  width: 196px;
+  height: 168px;
+  border-radius: 40px;
+  -webkit-transition: -webkit-transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), box-shadow 0.22s, opacity 0.3s;
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25), box-shadow 0.22s, opacity 0.3s;
+}
+.tile .tint { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 40px; overflow: hidden; }
+.tile .sheen {
+  position: absolute; left: 0; top: 0; right: 0; height: 60%; border-radius: 40px 40px 0 0;
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+  background: linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0));
+}
+.tile img { position: absolute; left: 50%; top: 50%; max-width: 62%; max-height: 56%; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
+.tile .word {
+  position: absolute; left: 8px; right: 8px; top: 50%; margin-top: -22px; height: 44px; line-height: 44px;
+  text-align: center; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.tile .label {
+  position: absolute; left: -40px; right: -40px; top: 100%; margin-top: 14px; text-align: center;
+  font-size: 24px; font-weight: 600; white-space: nowrap; opacity: 0; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  -webkit-transition: opacity 0.2s; transition: opacity 0.2s;
+}
+.tile.focus {
+  -webkit-transform: translateY(-14px) scale(1.14);
+  transform: translateY(-14px) scale(1.14);
+  box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, 0.85), inset 0 2px 0 rgba(255, 255, 255, 0.9), 0 26px 60px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+.tile.focus .label { opacity: 1; }
+
+/* MARK: - Notes from the phone */
+
+#notes { position: absolute; right: 90px; top: 80px; width: 560px; }
+.note {
+  position: relative;
+  margin-bottom: 20px;
+  padding: 26px 32px 24px 32px;
+  border-radius: 34px;
+  opacity: 0;
+  -webkit-transform: translateY(-16px);
+  transform: translateY(-16px);
+  -webkit-transition: opacity 0.4s, -webkit-transform 0.4s;
+  transition: opacity 0.4s, transform 0.4s;
+}
+.note.on { opacity: 1; -webkit-transform: none; transform: none; }
+.note .text { padding-right: 34px; font-size: 32px; font-weight: 600; line-height: 1.28; word-wrap: break-word; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.15); }
+.note .meta { margin-top: 12px; font-size: 22px; opacity: 0.75; }
+.note .heart { position: absolute; right: 24px; top: 22px; width: 30px; height: 30px; }
+.note.big {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 1100px;
+  margin: 0;
+  padding: 64px 80px 56px 80px;
+  border-radius: 56px;
+  -webkit-transform: translate(-50%, -50%) scale(0.96);
+  transform: translate(-50%, -50%) scale(0.96);
+  z-index: 20;
+}
+.note.big.on { -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
+.note.big .text { font-size: 64px; font-weight: 700; line-height: 1.2; }
+.note.big .meta { margin-top: 28px; font-size: 28px; }
+.note.big .heart { width: 54px; height: 54px; right: 44px; top: 40px; }
+#stage.dim:before { content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.35); z-index: 10; }
+
+/* MARK: - The assistant */
+
+#assistant {
+  position: absolute;
+  right: 90px;
+  top: 56px;
+  width: 900px;
+  padding: 30px 40px 26px 40px;
+  border-radius: 44px;
+  opacity: 0;
+  -webkit-transform: translateX(60px);
+  transform: translateX(60px);
+  -webkit-transition: opacity 0.35s, -webkit-transform 0.35s;
+  transition: opacity 0.35s, transform 0.35s;
+  z-index: 5;
+  pointer-events: none;
+}
+#assistant.on { opacity: 1; -webkit-transform: none; transform: none; pointer-events: auto; }
+#assistant.on ~ #notes, .assistant-on #notes { opacity: 0; }
+#assistant .who { font-size: 22px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; opacity: 0.8; }
+#assistant .dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 12px; background: #FF7AA8; box-shadow: 0 0 16px #FF7AA8; }
+#assistant.thinking .dot { -webkit-animation: pulse 1s ease-in-out infinite; animation: pulse 1s ease-in-out infinite; }
+@-webkit-keyframes pulse { 50% { opacity: 0.25; } }
+@keyframes pulse { 50% { opacity: 0.25; } }
+#assistant .asked { margin-top: 18px; font-size: 26px; opacity: 0.72; font-style: italic; }
+#assistant .said { margin-top: 10px; font-size: 34px; font-weight: 600; line-height: 1.28; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.15); }
+#assistant .recs { white-space: nowrap; margin-top: 4px; }
+#assistant .recs:empty { display: none; }
+.rec {
+  display: inline-block;
+  position: relative;
+  width: 176px;
+  margin: 22px 20px 0 0;
+  vertical-align: top;
+  white-space: normal;
+  -webkit-transition: -webkit-transform 0.2s; transition: transform 0.2s;
+}
+.rec .poster {
+  width: 176px; height: 250px; border-radius: 22px; background-color: rgba(255, 255, 255, 0.14);
+  background-size: cover; background-position: center; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  font-size: 26px; font-weight: 700; line-height: 1.2; padding: 22px 18px; overflow: hidden;
+}
+.rec .poster.img { font-size: 0; }
+.rec .t { margin-top: 12px; font-size: 22px; font-weight: 600; line-height: 1.2; max-height: 54px; overflow: hidden; }
+.rec .s { margin-top: 4px; font-size: 19px; opacity: 0.72; }
+.rec.focus { -webkit-transform: scale(1.08); transform: scale(1.08); }
+.rec.focus .poster { box-shadow: 0 0 0 4px #FFF, 0 18px 40px rgba(0, 0, 0, 0.4); }
+#assistant .hint { margin-top: 18px; font-size: 21px; opacity: 0.62; }
+#assistant .hint:empty { display: none; }
+
+/* MARK: - Toast */
+
+#toast {
+  position: absolute; left: 50%; top: 56px; padding: 18px 34px; border-radius: 36px; font-size: 28px; font-weight: 500;
+  -webkit-transform: translate(-50%, -20px); transform: translate(-50%, -20px); opacity: 0; z-index: 30; white-space: nowrap;
+  -webkit-transition: opacity 0.25s, -webkit-transform 0.25s; transition: opacity 0.25s, transform 0.25s;
+}
+#toast.on { opacity: 1; -webkit-transform: translate(-50%, 0); transform: translate(-50%, 0); }

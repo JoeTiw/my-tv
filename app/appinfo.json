@@ -1,0 +1,17 @@
+{
+  "id": "com.tiwari.tv",
+  "version": "1.0.0",
+  "vendor": "Tiwari",
+  "type": "web",
+  "main": "index.html",
+  "title": "Tiwari TV",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#1B1426",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": true,
+  "requiredACG": [
+    "application.launcher"
+  ]
+}

@@ -1,0 +1,7 @@
+# Your keys and settings stay on your computer
+app/config.js
+# Build output and tools
+out/
+*.ipk
+node_modules/
+.DS_Store

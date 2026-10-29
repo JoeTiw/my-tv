@@ -1,0 +1,14 @@
+{
+  "name": "tiwari-tv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A glassy home screen for the Tiwari family's LG TV: notes, photos and an assistant from your phone.",
+  "scripts": {
+    "setup": "bash scripts/tv.sh setup",
+    "install-tv": "bash scripts/tv.sh install",
+    "preview": "bash scripts/tv.sh preview"
+  },
+  "devDependencies": {
+    "@webos-tools/cli": "3.2.6"
+  }
+}
