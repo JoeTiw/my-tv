@@ -42,7 +42,16 @@ It creates `app/config.js` for your settings, gets LG's tools, and asks for the 
 bash scripts/tv.sh install
 ```
 
-Developer Mode lasts about 40 days: open the Developer Mode app on the TV now and then and press **EXTEND**.
+Developer Mode lasts about 40 days, then the TV removes developer apps. Let your Mac renew it by itself:
+
+```
+bash scripts/tv.sh autorenew
+```
+
+Run it with the TV on. Your Mac then checks every hour; about every 25 days, when the TV is on and showing
+Tiwari TV (so nobody's show is interrupted), it renews and brings Tiwari TV straight back. If it hasn't had a chance
+by day 33, a note on the TV and your phone asks you to press **EXTEND** in Developer Mode. What it did is in
+`~/.tiwari-tv/renew.log`; `bash scripts/tv.sh autorenew off` stops it.
 
 ## Use it from your phone
 

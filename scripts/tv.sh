@@ -4,6 +4,7 @@
 #   bash scripts/tv.sh setup 192.168.1.50   # once: your settings, LG's tools, and the TV's key (asks the passphrase)
 #   bash scripts/tv.sh install              # build the app and put it on the TV (every time you change something)
 #   bash scripts/tv.sh preview              # look at it in your computer's browser
+#   bash scripts/tv.sh autorenew            # keep Developer Mode from running out (renews by itself)
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -56,6 +57,50 @@ case "${1:-}" in
     npx ares-launch -d "$DEVICE" "$APP_ID"
     echo "Installed and open on the TV."
     echo "Developer Mode lasts about 40 days: open the Developer Mode app on the TV now and then and press EXTEND."
+    ;;
+  autorenew)
+    STATE="$HOME/.tiwari-tv"
+    PLIST="$HOME/Library/LaunchAgents/com.tiwari.tv.renew.plist"
+    if [ "${2:-}" = "off" ]; then
+      launchctl unload "$PLIST" 2>/dev/null || true
+      rm -f "$PLIST"
+      echo "Automatic renewal is off."
+      exit 0
+    fi
+    config
+    tools
+    mkdir -p "$STATE"
+    echo "Copying the renewal job and LG's tools to $STATE (background jobs can't use Downloads) ..."
+    cp scripts/renew.sh "$STATE/renew.sh"
+    sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1 > "$STATE/channel"
+    if [ ! -x "$STATE/tools/node_modules/.bin/ares-launch" ]; then
+      npm install --silent --prefix "$STATE/tools" @webos-tools/cli@3.2.6
+    fi
+    echo "Renewing now (the TV should be on) ..."
+    if ! bash "$STATE/renew.sh" --now; then
+      date +%s > "$STATE/devmode-renewed"
+      echo "Couldn't renew right now. To be safe, press EXTEND in Developer Mode on the TV today;"
+      echo "the job counts from today and renews by itself in about 25 days."
+    fi
+    mkdir -p "$(dirname "$PLIST")"
+    cat > "$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.tiwari.tv.renew</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$STATE/renew.sh</string></array>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$STATE/renew.out</string>
+  <key>StandardErrorPath</key><string>$STATE/renew.out</string>
+</dict>
+</plist>
+PLIST
+    launchctl unload "$PLIST" 2>/dev/null || true
+    launchctl load "$PLIST"
+    echo "Automatic renewal is on: your Mac checks every hour and renews about every 25 days."
+    echo "What it did: $STATE/renew.log  ·  To turn it off: bash scripts/tv.sh autorenew off"
     ;;
   preview)
     config
