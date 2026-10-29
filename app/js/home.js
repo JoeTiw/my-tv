@@ -19,7 +19,7 @@ var Home = (function () {
   // MARK: - Clock and weather
 
   function tick() {
-    var now = new Date(), t = U.time(now);
+    var now = U.now(), t = U.time(now);
     $('greet').textContent = L.greeting(now) + (C.familyName ? ', ' + (L.ne && C.familyNameNe ? C.familyNameNe : C.familyName) : '');
     $('clock').innerHTML = t.hm + '<span class="ampm">' + t.ampm + '</span>';
     $('date').textContent = U.longDate(now);
@@ -34,7 +34,7 @@ var Home = (function () {
   function theme() { return U.load('theme') || 'auto'; }
 
   function look() {
-    var t = theme(), night = t === 'dark' ? true : t === 'light' ? false : Weather.isNight(new Date());
+    var t = theme(), night = t === 'dark' ? true : t === 'light' ? false : Weather.isNight(U.now());
     U.cls(body, 'night', night);
   }
 

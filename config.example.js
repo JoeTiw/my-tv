@@ -8,6 +8,8 @@ window.TIWARI = {
   latitude: 27.7172,
   longitude: 85.3240,
   units: 'C',                 // 'C' or 'F'
+  // Your time zone (Nepal: '+05:45'). The clock uses this even when the TV itself is set to another zone.
+  utcOffset: '+05:45',
 
   // The words on the TV: 'en' (English) or 'ne' (नेपाली). The phone page can switch it too.
   language: 'en',

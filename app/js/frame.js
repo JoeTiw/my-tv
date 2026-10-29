@@ -90,7 +90,7 @@ var Frame = (function () {
   var caption = U.el('div', 'caption', box);
 
   function tick() {
-    var now = new Date(), t = U.time(now), bs = Calendar.today(now);
+    var now = U.now(), t = U.time(now), bs = Calendar.today(now);
     clock.innerHTML = t.hm + '<span>' + t.ampm + '</span>';
     date.textContent = U.longDate(now) + (bs ? ' · ' + (L.ne ? bs.ne : bs.en) : '');
   }
@@ -103,7 +103,7 @@ var Frame = (function () {
     next.className = 'slide on drift' + (index % 4);   // four slow drifts, in turn
     slides[front].className = 'slide off';
     front = 1 - front;
-    var d = new Date(p.at);
+    var d = U.at(p.at);
     caption.textContent = (p.from ? L.t('From {name}', {name: p.from}) + ' · ' : '') + U.longDate(d).replace(/^[^,]+, /, '');
     tick();
   }

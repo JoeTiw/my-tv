@@ -60,6 +60,29 @@ var U = (function () {
 
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
+  // MARK: - The family's clock
+  // The TV's own time zone can be wrong: LG TVs sold in the region often come set to India's (UTC+5:30), 15 minutes
+  // behind Nepal (UTC+5:45). So the time shown comes from config.js's utcOffset ('+05:45'), else from the weather
+  // service (which reports the city's offset), else from the TV.
+
+  /** The city's offset from UTC in minutes, or null when nothing says. */
+  function zoneMinutes() {
+    var m = /^([+-])(\d\d?):?(\d\d)$/.exec(String((window.TIWARI || {}).utcOffset || ''));
+    if (m) return (m[1] === '-' ? -1 : 1) * (+m[2] * 60 + +m[3]);
+    var w = load('weather');
+    return w && typeof w.utcOffset === 'number' ? Math.round(w.utcOffset / 60) : null;
+  }
+
+  /**
+   * A Date whose local fields (getHours, getDate…) read the city's time, whatever the TV's time zone is. Use it to show
+   * or compare times of day; Date.now() stays the real moment for anything measured.
+   */
+  function at(ms) {
+    var z = zoneMinutes(), d = new Date(ms);
+    return z === null ? d : new Date(ms + (z + d.getTimezoneOffset()) * 60000);
+  }
+  function now() { return at(Date.now()); }
+
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
     'November', 'December'];
@@ -71,5 +94,6 @@ var U = (function () {
   }
   function longDate(d) { return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate(); }
 
-  return {$: $, el: el, has: has, cls: cls, save: save, load: load, http: http, time: time, longDate: longDate, DAYS: DAYS};
+  return {$: $, el: el, has: has, cls: cls, save: save, load: load, http: http, time: time, longDate: longDate, DAYS: DAYS,
+    now: now, at: at, zoneMinutes: zoneMinutes};
 })();

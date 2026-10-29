@@ -9,7 +9,7 @@ var Picks = (function () {
   var C = window.TIWARI || {};
   var box = U.$('picks'), row = box.querySelector('.row'), busy = false;
 
-  function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function today() { var d = U.now(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
 
   function render(saved) {
     var items = saved && saved.items || [];

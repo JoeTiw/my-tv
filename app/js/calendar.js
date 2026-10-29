@@ -84,7 +84,7 @@ var Calendar = (function () {
 
   /** "Kartik 12, 2083" and "कात्तिक १२, २०८३". */
   function today(now) {
-    var b = toBS(now || new Date());
+    var b = toBS(now || U.now());
     if (!b) return null;
     return {
       en: MONTHS[b.month] + ' ' + b.day + ', ' + b.year,
@@ -103,7 +103,7 @@ var Calendar = (function () {
    * Add birthday: true for a birthday greeting.
    */
   function upcoming(now, days) {
-    now = now || new Date();
+    now = now || U.now();
     var start = dayNumber(now), end = start + days, out = [];
     function add(date, name, greeting, kind, nameNe, greetingNe) {
       if (!date) return;
@@ -156,7 +156,7 @@ var Calendar = (function () {
   var shownDay = -1;
 
   function render(force) {
-    var now = new Date(), n = dayNumber(now);
+    var now = U.now(), n = dayNumber(now);
     if (n === shownDay && !force) return;
     shownDay = n;
     var t = today(now), line = U.$('nepali');
@@ -181,7 +181,7 @@ var Calendar = (function () {
 
   /** For the assistant: today's BS date and the next few things on the calendar. */
   function summary() {
-    var t = today(), list = upcoming(new Date(), 60);
+    var t = today(), list = upcoming(U.now(), 60);
     return (t ? 'Nepali date today: ' + t.en + ' BS. ' : '')
       + (list.length ? 'Coming up: ' + list.map(function (e) { return e.name + ' (' + when(e).toLowerCase() + ')'; }).join(', ') + '.' : '');
   }

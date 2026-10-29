@@ -40,7 +40,7 @@ var Inbox = (function () {
       var card = U.el('div', 'note glass' + (isBig ? ' big' : ''), isBig ? stage : box);
       card.innerHTML = HEART;
       U.el('div', 'text', card, n.text);
-      var t = U.time(new Date(n.at));
+      var t = U.time(U.at(n.at));
       U.el('div', 'meta', card, (n.from ? n.from + ' · ' : '') + t.hm + ' ' + t.ampm);   // U.time speaks the TV's language
       (function (card) { setTimeout(function () { U.cls(card, 'on', true); }, 30); })(card);
     }

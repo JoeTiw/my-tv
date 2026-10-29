@@ -67,7 +67,7 @@ var Assistant = (function () {
 
   /** What the TV knows, for any request to Claude (the assistant and tonight's picks). */
   function context() {
-    var now = new Date(), w = Weather.current(), h = now.getHours(), m = now.getMinutes();
+    var now = U.now(), w = Weather.current(), h = now.getHours(), m = now.getMinutes();
     var clock = (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
     var apps = Home.apps().map(function (a) { return '- ' + a.title + ' (app_id: ' + a.id + ')'; }).join('\n');
     var lines = [
