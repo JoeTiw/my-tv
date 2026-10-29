@@ -37,6 +37,18 @@ It creates `app/config.js` for your settings, gets LG's tools, and asks for the 
 | `claudeKey` | The assistant | console.anthropic.com → API keys. Set a monthly spending limit there: the key lives on the TV. |
 | `tmdbKey` | Posters on the assistant's picks (optional) | themoviedb.org → Settings → API |
 
+## Sealed messages
+
+Everything on your phone channel is encrypted with your family's own key (`secret` in `app/config.js`, made by
+setup): notes, photos, questions, the TV's answers and the helper's messages. ntfy.sh only carries data nobody else
+can read, and the TV and the helper ignore anything not sealed with your key, so even someone who learned your
+channel name couldn't send to the TV or use your Claude key. The phone gets the key with its link (the part after
+`#`, which never leaves the phone). It uses [TweetNaCl](https://tweetnacl.js.org) (public domain): XSalsa20 and
+Poly1305, the same "secretbox" many messaging apps rely on.
+
+An older setup without a key: `bash scripts/tv.sh lock`, then install, helper, autorenew and phone again (it tells
+you). ntfy's own app and page can't send to a sealed TV; use the remote page (or set `acceptPlain: true`).
+
 ## The Nepali calendar
 
 Under the clock: today's Bikram Sambat date (in Devanagari too; `nepaliScript: false` for English letters only), and
@@ -150,7 +162,7 @@ this Mac is awake and on the home Wi-Fi:
 `~/.tiwari-tv/helper.log` shows what it did; `bash scripts/tv.sh helper off` stops it. Without the helper, everything
 else still works; the phone page says when the helper isn't answering.
 
-You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`):
+Every one of these is also a typed command (the remote page sends them sealed):
 
 | Send | The TV |
 |---|---|
@@ -166,7 +178,7 @@ You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`)
 | `/key play` · `pause` · `back` · `home` | a remote button (needs the helper) |
 | `/tiwari` | brings Tiwari TV to the front (needs the helper) |
 
-Messages pass through ntfy.sh, a free public relay, and stay there for a few hours.
+Messages pass through ntfy.sh, a free public relay, sealed (see below), and stay there for a few hours.
 
 ## On the TV
 
@@ -188,6 +200,7 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 |---|---|
 | `app/js/home.js` | clock, dock, focus and remote keys, day/night, background |
 | `app/js/inbox.js` | messages from the phone (ntfy.sh, live) |
+| `app/js/seal.js`, `helper/seal.mjs` | sealing everything on the channel (TweetNaCl, in `js/vendor`) |
 | `remote/index.html` | the phone's remote page (GitHub Pages) |
 | `app/js/assistant.js` | the assistant (Claude API, web search), its memory, cards and trailers (TMDB) |
 | `app/js/picks.js` | tonight's picks above the dock |

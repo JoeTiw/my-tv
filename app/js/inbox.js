@@ -18,6 +18,8 @@ var Inbox = (function () {
 
   var C = window.TIWARI || {};
   var CH = String(C.channel || '').replace(/^\s+|\s+$/g, '');
+  // With a secret in config.js, everything on the channel is sealed (js/seal.js): the TV opens what's sealed with
+  // the family's key, ignores anything else (unless acceptPlain: true), and seals what it sends.
   var BASE = 'https://ntfy.sh/' + encodeURIComponent(CH);
   var POLL_MS = 15000, BIG_MS = 90000, KEEP_MS = 24 * 3600000, MAX_NOTES = 3, REPLY_TAG = 'tiwari-reply';
   var HEART = '<svg class="heart" viewBox="0 0 30 30"><path d="M15 26S3 18.6 3 10.6A6.3 6.3 0 0 1 15 7.4a6.3 6.3 0 0 1 12 3.2C27 18.6 15 26 15 26z" fill="#FF7AA8"/></svg>';
@@ -67,10 +69,15 @@ var Inbox = (function () {
 
   // MARK: - Photos
 
-  /** Shown at once from its link; then kept on the TV as a 1280×720 JPEG, since ntfy deletes files after a few hours. */
-  function keepPhoto(url) {
-    Home.setWall({kind: 'image', src: url});
-    U.http(url, {type: 'blob', timeout: 60000}, function (err, blob) {
+  /**
+   * The background, from a link (shown at once, then kept) or from the photo itself (a Blob): kept on the TV as a
+   * 1280×720 JPEG, since ntfy deletes files after a few hours.
+   */
+  function keepPhoto(src) {
+    var url = typeof src === 'string' ? src : null;
+    if (url) { Home.setWall({kind: 'image', src: url}); U.http(url, {type: 'blob', timeout: 60000}, take); }
+    else take(null, src);
+    function take(err, blob) {
       if (err || !blob) return;
       var reader = new FileReader();
       reader.onload = function () {
@@ -83,13 +90,53 @@ var Inbox = (function () {
             var s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
             c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
             var now = U.load('wall');
-            if (now && now.src === url) Home.setWall({kind: 'image', src: c.toDataURL('image/jpeg', 0.84)});
+            if (!url || (now && now.src === url)) Home.setWall({kind: 'image', src: c.toDataURL('image/jpeg', 0.84)});
           } catch (e) {}   // no room, or the browser won't let us read it: the link stays
         };
         img.src = reader.result;
       };
       reader.readAsDataURL(blob);
+    }
+  }
+
+  // MARK: - Sealed messages
+
+  /** The message as the TV handles it (opened when sealed), or null when it isn't ours. */
+  function unseal(m) {
+    if (!Seal.on()) return m;
+    var p = Seal.open(m.message);
+    if (!p) return C.acceptPlain ? m : null;
+    return {id: m.id, time: m.time, event: m.event, message: String(p.m || ''), title: p.f || '', tags: p.g || [],
+      attachment: m.attachment, kind: p.k || '', mime: p.t || ''};
+  }
+
+  /** The file a message brings, opened if it's sealed: done(Blob, or JSON for type 'json', or null). */
+  function file(m, type, done) {
+    var url = m.attachment && m.attachment.url;
+    if (!url) { done(null); return; }
+    if (!m.kind) { U.http(url, {type: type, timeout: 90000}, function (err, v) { done(err ? null : v); }); return; }
+    U.http(url, {type: 'arraybuffer', timeout: 90000}, function (err, buf) {
+      var bytes = !err && buf && Seal.openBytes(new Uint8Array(buf));
+      if (!bytes) { done(null); return; }
+      if (type === 'json') {
+        var s = '';
+        for (var i = 0; i < bytes.length; i += 8192) s += String.fromCharCode.apply(null, Array.prototype.slice.call(bytes.subarray(i, i + 8192)));
+        try { done(JSON.parse(decodeURIComponent(escape(s)))); } catch (e) { done(null); }
+        return;
+      }
+      done(new Blob([bytes], {type: m.mime || 'image/jpeg'}));
     });
+  }
+
+  /** Sends to the channel: sealed when there's a key (who it's from and its tags inside), else as before. */
+  function post(text, tags) {
+    if (!CH || !text) return;
+    if (Seal.on()) {
+      U.http(BASE, {method: 'POST', body: Seal.seal({m: text, f: 'Tiwari TV', g: tags}), headers: {'Content-Type': 'text/plain'}}, function () {});
+      return;
+    }
+    U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=' + tags.join(','),
+      {method: 'POST', body: text, headers: {'Content-Type': 'text/plain'}}, function () {});
   }
 
   // MARK: - Messages
@@ -133,13 +180,12 @@ var Inbox = (function () {
   function handle(m, fresh) {
     for (var t = 0; m.tags && t < m.tags.length; t++) if (String(m.tags[t]).indexOf('tiwari-') === 0) return;   // the TV's own
     var text = String(m.message || ''), a = m.attachment;
-    if (a && a.url && /^\s*\/icons\s*$/i.test(text)) { takeIcons(a.url); return; }
-    if (a && a.url && /^image\//.test(a.type || '') && /^\s*\/frame\b/i.test(text)) {
-      framePhoto(a.url, m);
-      return;
-    }
-    if (a && a.url && /^image\//.test(a.type || '')) {
-      keepPhoto(a.url);
+    if (a && a.url && /^\s*\/icons\s*$/i.test(text)) { takeIcons(m); return; }
+    var photo = a && a.url && (m.kind ? m.kind === 'photo' : /^image\//.test(a.type || ''));
+    if (photo && /^\s*\/frame\b/i.test(text)) { framePhoto(m); return; }
+    if (photo) {
+      if (m.kind) file(m, 'blob', function (blob) { if (blob) keepPhoto(blob); });
+      else keepPhoto(a.url);
       if (!text || text.indexOf('You received a file') === 0) return;   // what ntfy writes for a photo alone
     }
     if (text.charAt(0) === '/') { command(text, fresh); return; }
@@ -176,9 +222,10 @@ var Inbox = (function () {
       seenIds[m.id] = true;
       seenOrder.push(m.id);
       if (seenOrder.length > 200) delete seenIds[seenOrder.shift()];
-      handle(m, primed && Date.now() - m.time * 1000 < 10 * 60000);
       lastId = m.id;
       got = true;
+      var mine = unseal(m);
+      if (mine) handle(mine, primed && Date.now() - m.time * 1000 < 10 * 60000);
     }
     if (got) U.save('lastId', lastId);
   }
@@ -216,15 +263,14 @@ var Inbox = (function () {
   /** Tells the phone page which apps this TV has (tagged, so the TV skips it). */
   function announce() {
     if (!CH) return;
-    var list = Home.apps().map(function (a) { return {id: a.id, title: a.title, color: a.color}; });
-    U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=tiwari-apps',
-      {method: 'POST', body: JSON.stringify(list), headers: {'Content-Type': 'text/plain'}}, function () {});
+    var list = Home.apps().slice(0, 40).map(function (a) { return {id: a.id, title: a.title, color: a.color}; });
+    post(JSON.stringify(list), ['tiwari-apps']);
   }
 
   /** The helper's {apps: [{id, title, color, icon (a data: URL)}]}: kept, and the dock drawn again with them. */
-  function takeIcons(url) {
-    U.http(url, {type: 'json', timeout: 60000}, function (err, data) {
-      if (err || !data || !data.apps || !data.apps.length) return;
+  function takeIcons(m) {
+    file(m, 'json', function (data) {
+      if (!data || !data.apps || !data.apps.length) return;
       var icons = {}, list = [];
       data.apps.forEach(function (x) {
         if (!x || !x.id) return;
@@ -239,9 +285,12 @@ var Inbox = (function () {
 
   // Photos for the frame: kept one by one; one answer to the phone when a batch is in.
   var added = 0, missed = 0, addedTimer = 0;
-  function framePhoto(url, m) {
+  function framePhoto(m) {
     var from = m.title && String(m.title).indexOf('ntfy.sh/') !== 0 ? String(m.title) : '';
-    Frame.add(url, from, (m.time || 0) * 1000 || Date.now(), function (ok) {
+    if (m.kind) file(m, 'blob', function (blob) { if (blob) addToFrame(blob); else counted(false); });
+    else addToFrame(m.attachment.url);
+    function addToFrame(src) { Frame.add(src, from, (m.time || 0) * 1000 || Date.now(), counted); }
+    function counted(ok) {
       if (ok) added++; else missed++;
       clearTimeout(addedTimer);
       addedTimer = setTimeout(function () {
@@ -251,15 +300,11 @@ var Inbox = (function () {
         added = missed = 0;
         if (text) { reply(text.replace(/^ /, '')); Home.toast(text.replace(/^ /, '').split(' (')[0]); }
       }, 4000);
-    });
+    }
   }
 
   /** Sends the TV's answer back to the phone (tagged, so the TV skips it). Plain POST: no CORS preflight. */
-  function reply(text) {
-    if (!CH || !text) return;
-    U.http(BASE + '?title=' + encodeURIComponent('Tiwari TV') + '&tags=' + REPLY_TAG + ',tv',
-      {method: 'POST', body: text, headers: {'Content-Type': 'text/plain'}}, function () {});
-  }
+  function reply(text) { post(text, [REPLY_TAG, 'tv']); }
 
   function start() {
     render();

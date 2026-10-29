@@ -63,15 +63,27 @@ renew() {
   echo "Renewed Developer Mode. Next renewal in about $DUE_DAYS days."
 }
 
+# Seals a note with the family's key (as js/seal.js does), so the TV takes it.
+seal() {
+  node -e '
+    const nacl = require(process.argv[1]);
+    const key = new Uint8Array(Buffer.from(process.argv[2], "hex")), nonce = nacl.randomBytes(24);
+    const box = nacl.secretbox(Buffer.from(JSON.stringify({m: process.argv[3], f: "Tiwari TV", g: [], k: ""})), nonce, key);
+    process.stdout.write("TT1." + Buffer.concat([Buffer.from(nonce), Buffer.from(box)]).toString("base64"));
+  ' "$STATE/tools/node_modules/tweetnacl" "$1" "$2"
+}
+
 # A note for the TV and the phone, through the same channel as everything else (at most once a day).
 ask() {
-  local channel
+  local channel secret text body
   channel="$(cat "$STATE/channel" 2>/dev/null)"
+  secret="$(cat "$STATE/secret" 2>/dev/null)"
   [ -n "$channel" ] || return 0
   [ "$(days_since "$ASKED")" -ge 1 ] || return 0
-  if curl -s -m 15 -o /dev/null -H "Title: Tiwari TV" \
-      -d "Tiwari TV needs a quick renewal: on the TV, open Developer Mode and press EXTEND." \
-      "https://ntfy.sh/$channel"; then
+  text="Tiwari TV needs a quick renewal: on the TV, open Developer Mode and press EXTEND."
+  body="$text"
+  if [ -n "$secret" ]; then body="$(seal "$secret" "$text")" || return 0; fi
+  if curl -s -m 15 -o /dev/null -H "Title: Tiwari TV" -d "$body" "https://ntfy.sh/$channel"; then
     date +%s > "$ASKED"
     log "asked for a manual EXTEND"
   fi

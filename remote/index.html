@@ -210,7 +210,7 @@
 
   <section class="glass setup hidden" id="setup">
     <h2>Connect to your TV</h2>
-    <p>Paste the phone link from setup on your Mac (it starts with https://ntfy.sh/tiwari-), or just the channel name.</p>
+    <p>On your Mac, run <b>bash scripts/tv.sh phone</b> and open the link it shows on this phone (or paste it here). It carries your private channel and the key that locks your messages.</p>
     <input class="field" id="channelInput" placeholder="tiwari-…" autocomplete="off" autocapitalize="off" spellcheck="false">
     <div class="row"><span class="grow"></span><button class="btn go" id="channelSave">Connect</button></div>
   </section>
@@ -298,6 +298,8 @@
 </main>
 <div id="toast"></div>
 
+<script src="nacl-fast.min.js"></script>
+<script src="seal.js"></script>
 <script>
 (function () {
   'use strict';
@@ -331,32 +333,41 @@
 
   // MARK: - The channel: from the link's #, or typed once; kept on this phone only
 
-  function cleanChannel(s) {
+  /** "tiwari-….<64 hex>" (the part after # in the link from setup) → {channel, key}; the key may be missing. */
+  function parseLink(s) {
     s = String(s || '').trim();
+    var hash = s.indexOf('#');
+    if (hash >= 0) s = s.slice(hash + 1);
     var m = /ntfy\.sh\/([A-Za-z0-9_-]+)/.exec(s);
     if (m) s = m[1];
-    s = s.replace(/^#/, '');
-    return /^[A-Za-z0-9_-]{8,64}$/.test(s) ? s : '';
+    var parts = s.split('.'), ch = parts[0], key = parts[1] || '';
+    return {channel: /^[A-Za-z0-9_-]{8,64}$/.test(ch) ? ch : '', key: /^[0-9a-f]{64}$/i.test(key) ? key.toLowerCase() : ''};
   }
 
-  var channel = cleanChannel(location.hash) || cleanChannel(stored('channel'));
-  if (location.hash) {
-    if (channel) store('channel', channel);
-    history.replaceState(null, '', location.pathname + location.search);   // the secret leaves the address bar
-  }
+  var fromLink = parseLink(location.hash);
+  if (fromLink.channel) { store('channel', fromLink.channel); if (fromLink.key) store('key', fromLink.key); }
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);   // the secret leaves the address bar
+  var channel = stored('channel') || '';
+  Seal.setKey(stored('key') || '');
 
   // MARK: - Sending
 
+  /**
+   * Sends to the TV, sealed with the family's key (js/seal.js): the words, who sent them and, for a photo, the photo
+   * itself; ntfy only carries what nobody else can read. A string or an untyped Blob: no CORS preflight.
+   */
   function send(text, opts) {
     opts = opts || {};
-    var params = new URLSearchParams();
-    var name = stored('name');
-    if (name) params.set('title', name);
-    if (opts.filename) params.set('filename', opts.filename);
-    if (opts.blob && text) params.set('message', text);   // words with a photo (like /frame) ride along
-    // A string or an untyped Blob keeps this a "simple" request: no CORS preflight.
-    return fetch(NTFY + encodeURIComponent(channel) + '?' + params.toString(), {method: 'POST', body: opts.blob || text})
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
+    var params = new URLSearchParams(), name = stored('name') || '';
+    var body = opts.blob ? opts.blob.arrayBuffer().then(function (buf) { return new Blob([Seal.sealBytes(new Uint8Array(buf))]); })
+      : Promise.resolve(Seal.seal({m: text, f: name, g: [], k: ''}));
+    if (opts.blob) {
+      params.set('filename', 'sealed.bin');
+      params.set('message', Seal.seal({m: text || '', f: name, g: [], k: 'photo', t: 'image/jpeg'}));
+    }
+    return body.then(function (b) {
+      return fetch(NTFY + encodeURIComponent(channel) + (opts.blob ? '?' + params.toString() : ''), {method: 'POST', body: b});
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
   }
 
   function sent(what) { return function () { buzz(); toast(what); }; }
@@ -422,7 +433,11 @@
       var m;
       try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.event !== 'message' || !m.message) return;
-      var tags = m.tags || [];
+      var p = Seal.open(m.message);
+      if (!p) return;   // not sealed with our key: not ours
+      m.message = String(p.m || '');
+      m.title = p.f || '';
+      var tags = p.g || [];
       if (tags.indexOf('tiwari-apps') >= 0) {
         try {
           var list = JSON.parse(m.message);
@@ -518,10 +533,12 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden && channel) askHelper(); });
 
   $('channelSave').onclick = function () {
-    var c = cleanChannel($('channelInput').value);
-    if (!c) { toast("That doesn't look like a Tiwari TV channel"); return; }
-    channel = c;
-    store('channel', c);
+    var l = parseLink($('channelInput').value);
+    if (!l.channel || !l.key) { toast("That isn't the full link from your Mac"); return; }
+    channel = l.channel;
+    store('channel', l.channel);
+    store('key', l.key);
+    Seal.setKey(l.key);
     start();
   };
 
@@ -648,12 +665,14 @@
   $('forget').onclick = function () {
     if (!confirm('Disconnect this phone from the TV? You can paste the link again any time.')) return;
     store('channel', null);
+    store('key', null);
+    Seal.setKey('');
     channel = '';
     if (events) events.close();
     showSetup();
   };
 
-  if (channel) start(); else showSetup();
+  if (channel && Seal.on()) start(); else showSetup();
 })();
 </script>
 </body>

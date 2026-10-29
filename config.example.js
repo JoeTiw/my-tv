@@ -18,6 +18,11 @@ window.TIWARI = {
   // Your private phone channel on ntfy.sh: open https://ntfy.sh/<channel> on your phone to send to the TV.
   // A long random name is the only lock: anyone who knows it can send to your TV. Setup makes one.
   channel: 'CHANNEL',
+  // The key that seals everything on the channel (64 hex letters; setup makes it): nobody else can read your
+  // messages, and the TV ignores anything not sealed with it. Your phone gets it with the link from
+  // `bash scripts/tv.sh phone`. acceptPlain: true would also take unsealed messages (ntfy's own app).
+  secret: 'SECRET',
+  acceptPlain: false,
 
   // The assistant ("Hey TV, ..."): a Claude API key from console.anthropic.com. Empty = assistant off.
   // It lives on your TV, so set a monthly spending limit on it in the Claude Console.

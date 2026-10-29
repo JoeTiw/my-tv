@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import * as Seal from './seal.mjs';
 
 const STATE = process.env.TIWARI_STATE || path.join(os.homedir(), '.tiwari-tv');
 const NTFY = process.env.TIWARI_NTFY || 'https://ntfy.sh/';
@@ -21,7 +22,9 @@ const KEYS = {play: 'PLAY', pause: 'PAUSE', home: 'HOME', back: 'BACK', ok: 'ENT
   left: 'LEFT', right: 'RIGHT', exit: 'EXIT'};
 const ASK = /^\s*(hey[\s,]+tv|ok[\s,]+tv|tv)\s*[,:!.-]?\s+/i;
 
-const settings = JSON.parse(fs.readFileSync(path.join(STATE, 'helper.json'), 'utf8'));   // {host, channel}
+const settings = JSON.parse(fs.readFileSync(path.join(STATE, 'helper.json'), 'utf8'));   // {host, channel, secret}
+// With the family's secret, everything on the channel is sealed (seal.mjs): only sealed messages are obeyed.
+const KEY = Seal.keyFrom(settings.secret);
 const pairing = process.argv.includes('--pair');
 
 function log(...a) { console.log(new Date().toISOString().slice(0, 16).replace('T', ' '), ...a); }
@@ -72,8 +75,11 @@ async function sendIcons() {
     const json = JSON.stringify({apps});
     const sig = String(json.length) + ':' + apps.map((a) => a.id + (a.icon ? '+' : '')).join(',');
     if (fs.existsSync(ICONS_SENT) && fs.readFileSync(ICONS_SENT, 'utf8') === sig && !process.env.TIWARI_FORCE_ICONS) return;
-    const q = new URLSearchParams({title: 'Tiwari TV', filename: 'apps.json', message: '/icons'});
-    const r = await fetch(NTFY + encodeURIComponent(settings.channel) + '?' + q, {method: 'POST', body: json});
+    const q = KEY
+      ? new URLSearchParams({filename: 'sealed.bin', message: Seal.seal(KEY, {m: '/icons', f: 'Tiwari TV', g: [], k: 'icons'})})
+      : new URLSearchParams({title: 'Tiwari TV', filename: 'apps.json', message: '/icons'});
+    const body = KEY ? Seal.sealBytes(KEY, Buffer.from(json, 'utf8')) : json;
+    const r = await fetch(NTFY + encodeURIComponent(settings.channel) + '?' + q, {method: 'POST', body});
     if (r.ok) { fs.writeFileSync(ICONS_SENT, sig); log('Sent Tiwari TV the TV\'s', apps.length, 'apps and their icons.'); }
   } catch (err) {
     log('Could not list the TV\'s apps:', err.message || err);
@@ -103,8 +109,20 @@ async function foreground() {
 // MARK: - The channel
 
 function post(text, tags) {
+  if (KEY) {
+    const body = Seal.seal(KEY, {m: text, f: 'Tiwari TV', g: String(tags).split(','), k: ''});
+    return fetch(NTFY + encodeURIComponent(settings.channel), {method: 'POST', body}).catch(() => {});
+  }
   const q = new URLSearchParams({title: 'Tiwari TV', tags});
   return fetch(NTFY + encodeURIComponent(settings.channel) + '?' + q, {method: 'POST', body: text}).catch(() => {});
+}
+
+/** The message as the helper handles it (opened when sealed), or null when it isn't ours. */
+function unseal(m) {
+  if (!KEY) return m;
+  const p = Seal.open(KEY, m.message);
+  if (!p) return null;   // not sealed with the family's key: ignored, whoever sent it
+  return Object.assign({}, m, {message: String(p.m || ''), title: p.f || '', tags: p.g || [], kind: p.k || ''});
 }
 
 let statusTimer = null;
@@ -187,7 +205,8 @@ async function listen() {
           try { m = JSON.parse(line); } catch (e) { continue; }
           if (m.event !== 'message') continue;
           since = m.id;
-          await handle(m);
+          const mine = unseal(m);
+          if (mine) await handle(mine);
         }
       }
     } catch (err) {

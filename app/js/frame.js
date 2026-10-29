@@ -55,10 +55,12 @@ var Frame = (function () {
     stop();
   }
 
-  /** A photo from its link: made at most 1920×1080 (its own shape kept) and kept. done(ok). */
-  function add(url, from, at, done) {
+  /** A photo (its link, or the photo itself as a Blob): made at most 1920×1080, its own shape kept, and kept. done(ok). */
+  function add(src, from, at, done) {
     done = done || function () {};
-    U.http(url, {type: 'blob', timeout: 90000}, function (err, blob) {
+    if (typeof src !== 'string') { take(null, src); return; }
+    U.http(src, {type: 'blob', timeout: 90000}, take);
+    function take(err, blob) {
       if (err || !blob) { done(false); return; }
       var reader = new FileReader();
       reader.onload = function () {
@@ -77,7 +79,7 @@ var Frame = (function () {
         img.src = reader.result;
       };
       reader.readAsDataURL(blob);
-    });
+    }
   }
 
   // MARK: - On screen

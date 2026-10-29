@@ -7,6 +7,7 @@
 #   bash scripts/tv.sh autorenew            # keep Developer Mode from running out (renews by itself)
 #   bash scripts/tv.sh phone                # the link for your phone's remote page
 #   bash scripts/tv.sh helper               # let this Mac control the TV for the phone (volume, buttons, apps)
+#   bash scripts/tv.sh lock                 # seal everything on your channel with a key (older setups)
 #
 # Before setup, on the TV: LG Content Store > Developer Mode > sign in (free LG developer account) >
 # Dev Mode Status on (the TV restarts) > Key Server on.
@@ -15,11 +16,17 @@ cd "$(dirname "$0")/.."
 DEVICE=tiwari-tv
 APP_ID=com.tiwari.tv
 
+new_secret() { od -An -N32 -tx1 /dev/urandom | tr -d ' \n'; }   # 64 random hex letters
+
+secret_of() { sed -n "s/.*secret: '\([0-9a-f]\{64\}\)'.*/\1/p" app/config.js | head -n 1; }
+channel_of() { sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1; }
+
 config() {
   if [ ! -f app/config.js ]; then
     # A private channel name for the phone, made here so it's never in the repository.
     channel="tiwari-$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"   # 24 random hex letters
-    sed "s/'CHANNEL'/'$channel'/" config.example.js > app/config.js
+    secret="$(new_secret)"
+    sed -e "s/'CHANNEL'/'$channel'/" -e "s/'SECRET'/'$secret'/" config.example.js > app/config.js
     echo "Made app/config.js (it stays on this computer). Add your keys there."
     echo "Your phone channel: https://ntfy.sh/$channel"
   fi
@@ -74,9 +81,11 @@ case "${1:-}" in
     mkdir -p "$STATE"
     echo "Copying the renewal job and LG's tools to $STATE (background jobs can't use Downloads) ..."
     cp scripts/renew.sh "$STATE/renew.sh"
-    sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1 > "$STATE/channel"
-    if [ ! -x "$STATE/tools/node_modules/.bin/ares-launch" ]; then
-      npm install --silent --prefix "$STATE/tools" @webos-tools/cli@3.2.6
+    channel_of > "$STATE/channel"
+    secret_of > "$STATE/secret"
+    chmod 600 "$STATE/secret"
+    if [ ! -x "$STATE/tools/node_modules/.bin/ares-launch" ] || [ ! -d "$STATE/tools/node_modules/tweetnacl" ]; then
+      npm install --silent --prefix "$STATE/tools" @webos-tools/cli@3.2.6 tweetnacl@1.0.3
     fi
     echo "Renewing now (the TV should be on) ..."
     if ! bash "$STATE/renew.sh" --now; then
@@ -104,6 +113,25 @@ PLIST
     echo "Automatic renewal is on: your Mac checks every hour and renews about every 25 days."
     echo "What it did: $STATE/renew.log  ·  To turn it off: bash scripts/tv.sh autorenew off"
     ;;
+  lock)
+    config
+    if [ -n "$(secret_of)" ]; then
+      echo "Your channel is already sealed with a key."
+    else
+      secret="$(new_secret)"
+      # The key goes right after the channel line, in your private app/config.js.
+      awk -v s="$secret" '{print} /^[[:space:]]*channel:/ && !done {print "  secret: '"'"'" s "'"'"',"; print "  acceptPlain: false,"; done=1}' \
+        app/config.js > app/config.js.new && mv app/config.js.new app/config.js
+      [ -n "$(secret_of)" ] || { echo "Couldn't add the key to app/config.js." >&2; exit 1; }
+      echo "Added a key to app/config.js: everything on your channel is sealed from now on."
+    fi
+    echo
+    echo "Now, so all three parts have the key:"
+    echo "  1. bash scripts/tv.sh install     (the TV)"
+    echo "  2. bash scripts/tv.sh helper      (the helper on this Mac, if you use it)"
+    echo "  3. bash scripts/tv.sh autorenew   (the renewal reminder, if you use it)"
+    echo "  4. bash scripts/tv.sh phone       (open the new link on each phone)"
+    ;;
   helper)
     STATE="$HOME/.tiwari-tv"
     PLIST="$HOME/Library/LaunchAgents/com.tiwari.tv.helper.plist"
@@ -116,12 +144,14 @@ PLIST
     config
     tools
     ip="${2:-$(npx ares-setup-device -l 2>/dev/null | sed -n "s/^$DEVICE[^@]*@\([0-9.]*\):.*/\1/p" | head -n 1)}"
-    channel="$(sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1)"
+    channel="$(channel_of)"
+    secret="$(secret_of)"
     if [ -z "$ip" ]; then echo "Run setup first (bash scripts/tv.sh setup <TV IP>), or: bash scripts/tv.sh helper <TV IP>" >&2; exit 1; fi
     node="$(command -v node)"
     mkdir -p "$STATE/helper"
-    cp helper/helper.mjs helper/package.json "$STATE/helper/"
-    printf '{"host": "%s", "channel": "%s"}\n' "$ip" "$channel" > "$STATE/helper.json"
+    cp helper/helper.mjs helper/seal.mjs helper/package.json "$STATE/helper/"
+    printf '{"host": "%s", "channel": "%s", "secret": "%s"}\n' "$ip" "$channel" "$secret" > "$STATE/helper.json"
+    chmod 600 "$STATE/helper.json"
     echo "Getting the helper's TV library ..."
     (cd "$STATE/helper" && npm install --silent --omit=dev)
     echo "Pairing with the TV at $ip: the TV will ask to allow Tiwari TV Helper. Accept it with the remote."
@@ -151,12 +181,14 @@ PLIST
     origin="$(git remote get-url origin 2>/dev/null || true)"
     owner="$(echo "$origin" | sed -n 's#.*github.com[:/]\([^/]*\)/.*#\1#p')"
     repo="$(echo "$origin" | sed -n 's#.*github.com[:/][^/]*/\([^/.]*\).*#\1#p')"
-    channel="$(sed -n "s/.*channel: '\([^']*\)'.*/\1/p" app/config.js | head -n 1)"
+    channel="$(channel_of)"
+    secret="$(secret_of)"
+    if [ -z "$secret" ]; then echo "First seal your channel with a key: bash scripts/tv.sh lock" >&2; exit 1; fi
     if [ -z "$owner" ] || [ -z "$repo" ]; then echo "This folder isn't linked to a GitHub repository." >&2; exit 1; fi
     owner="$(echo "$owner" | tr '[:upper:]' '[:lower:]')"
     echo "Open this on your phone (it's private: don't share it):"
     echo
-    echo "  https://$owner.github.io/$repo/remote/#$channel"
+    echo "  https://$owner.github.io/$repo/remote/#$channel.$secret"
     echo
     echo "Then Share > Add to Home Screen. (GitHub Pages must be on: repository Settings > Pages > main, / (root).)"
     ;;

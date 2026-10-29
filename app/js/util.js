@@ -29,7 +29,7 @@ var U = (function () {
     opts = opts || {};
     var xhr = new XMLHttpRequest(), finished = false;
     xhr.open(opts.method || 'GET', url);
-    if (opts.type === 'blob') xhr.responseType = 'blob';
+    if (opts.type === 'blob' || opts.type === 'arraybuffer') xhr.responseType = opts.type;
     xhr.timeout = opts.timeout || 20000;
     var h = opts.headers || {};
     for (var k in h) if (h.hasOwnProperty(k)) xhr.setRequestHeader(k, h[k]);
@@ -40,10 +40,10 @@ var U = (function () {
     }
     xhr.onload = function () {
       if (xhr.status < 200 || xhr.status >= 300) {
-        finish(new Error('HTTP ' + xhr.status + (opts.type === 'blob' ? '' : ': ' + String(xhr.responseText).slice(0, 300))));
+        finish(new Error('HTTP ' + xhr.status + (opts.type === 'blob' || opts.type === 'arraybuffer' ? '' : ': ' + String(xhr.responseText).slice(0, 300))));
         return;
       }
-      if (opts.type === 'blob') { finish(null, xhr.response); return; }
+      if (opts.type === 'blob' || opts.type === 'arraybuffer') { finish(null, xhr.response); return; }
       if (opts.type === 'json') {
         var v;
         try { v = JSON.parse(xhr.responseText); } catch (e) { finish(e); return; }
