@@ -86,7 +86,7 @@ var Home = (function () {
    * picture (nothing taken away), or an icon the TV won't let the page read.
    */
   // Lifting (and enlarging) takes the TV a moment: what came out is kept, by a short fingerprint of the icon.
-  var LIFT_VERSION = 3, kept = U.load('lifted');
+  var LIFT_VERSION = 5, kept = U.load('lifted');
   if (!kept || kept.v !== LIFT_VERSION) kept = {v: LIFT_VERSION, marks: {}};
   function print(src) {
     var h = 0;
@@ -146,10 +146,19 @@ var Home = (function () {
     // white icon) stays. The background is followed in from the edges, through pixels like it.
     var keeps = new Float32Array(w * h), outside = new Uint8Array(w * h), q, p;
     if (best) {
+      var dist = new Float32Array(w * h);
       for (p = 0; p < w * h; p++) {
         q = p * 4;
-        var dd = Math.max(Math.abs(px[q] - best[0]), Math.abs(px[q + 1] - best[1]), Math.abs(px[q + 2] - best[2])) / 255;
-        keeps[p] = px[q + 3] < 8 ? 0 : Math.max(0, Math.min(1, (dd - 0.1) / 0.22));
+        dist[p] = px[q + 3] < 8 ? 0 : Math.max(Math.abs(px[q] - best[0]), Math.abs(px[q + 1] - best[1]), Math.abs(px[q + 2] - best[2])) / 255;
+      }
+      // How much of a pixel is mark: its difference from the background against its neighbors' biggest (an edge
+      // pixel half red, half white is half the way to the red beside it), and nothing for what's nearly background.
+      for (p = 0; p < w * h; p++) {
+        var dd = dist[p], top = dd, cx0 = p % w, cy0 = (p / w) | 0;
+        for (var ny0 = Math.max(0, cy0 - 1); ny0 <= Math.min(h - 1, cy0 + 1); ny0++) {
+          for (var nx0 = Math.max(0, cx0 - 1); nx0 <= Math.min(w - 1, cx0 + 1); nx0++) if (dist[ny0 * w + nx0] > top) top = dist[ny0 * w + nx0];
+        }
+        keeps[p] = Math.max(0, Math.min(1, (dd - 0.1) / 0.22, top > 0 ? dd / (top * 0.92) : 0));
       }
       var stack = [];
       for (var e = 0; e < w; e++) { stack.push(e); stack.push((h - 1) * w + e); }
@@ -175,6 +184,25 @@ var Home = (function () {
         }
       }
       outside = near;
+      // What's enclosed: kept only when color surrounds it (a white play sign in a red button). Enclosed by plain
+      // dark or gray strokes (the holes in o, b, e of a name), it's background too.
+      var seen = new Uint8Array(w * h);
+      for (p = 0; p < w * h; p++) {
+        if (outside[p] || seen[p] || keeps[p] >= 1) continue;
+        var part = [], ring = 0, ringN = 0, todo = [p];
+        seen[p] = 1;
+        while (todo.length) {
+          var u = todo.pop(), ux = u % w, nb = [ux > 0 ? u - 1 : -1, ux < w - 1 ? u + 1 : -1, u >= w ? u - w : -1, u < w * (h - 1) ? u + w : -1];
+          part.push(u);
+          for (var z = 0; z < 4; z++) {
+            var v = nb[z];
+            if (v < 0 || seen[v]) continue;
+            if (keeps[v] < 1 && !outside[v]) { seen[v] = 1; todo.push(v); }
+            else if (keeps[v] >= 1) { var vq = v * 4; ring += (Math.max(px[vq], px[vq + 1], px[vq + 2]) - Math.min(px[vq], px[vq + 1], px[vq + 2])) / 255; ringN++; }
+          }
+        }
+        if (!ringN || ring / ringN < 0.3) for (z = 0; z < part.length; z++) outside[part[z]] = 1;
+      }
     }
     var minX = w, minY = h, maxX = -1, maxY = -1, ink = 0, hue = 0, inkN = 0;
     for (p = 0; p < w * h; p++) {
@@ -201,6 +229,13 @@ var Home = (function () {
       }
     }
     if (maxX < 0 || (maxX - minX > w * 0.95 && maxY - minY > h * 0.95)) return null;   // nothing left, or nothing taken
+    // A colored symbol beside a plain name in black or gray (a red play button, then the word): just the symbol.
+    // The name is under the tile anyway, and from a small icon its letters only come out as a smudge.
+    var sym = symbolOnly(px, w, minX, minY, maxX, maxY);
+    if (sym) {
+      minX = sym.minX; maxX = sym.maxX; minY = sym.minY; maxY = sym.maxY;
+      ink = sym.ink; hue = sym.hue; inkN = sym.n;
+    }
     g.putImageData(data, 0, 0);
     var crop = document.createElement('canvas');
     crop.width = maxX - minX + 1;
@@ -210,6 +245,40 @@ var Home = (function () {
     var bgHex = best ? '#' + ((1 << 24) | (best[0] << 16) | (best[1] << 8) | best[2]).toString(16).slice(1) : '';
     var big = enlarge(crop, 150, 86, true);   // a small icon's mark: made big enough for the tile, edges crisp
     return {src: big.toDataURL('image/png'), w: crop.width, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+  }
+
+  /** The symbol's box, when a wide mark is a colored symbol, a gap, then plain dark or gray letters; else null. */
+  function symbolOnly(px, w, minX, minY, maxX, maxY) {
+    if ((maxX - minX + 1) < 2.2 * (maxY - minY + 1)) return null;
+    function stats(x0, x1) {
+      var o = {minX: x1, maxX: x0, minY: maxY, maxY: minY, ink: 0, hue: 0, n: 0};
+      for (var y = minY; y <= maxY; y++) for (var x = x0; x <= x1; x++) {
+        var j = (y * w + x) * 4;
+        if (px[j + 3] < 90) continue;
+        if (x < o.minX) o.minX = x;
+        if (x > o.maxX) o.maxX = x;
+        if (y < o.minY) o.minY = y;
+        if (y > o.maxY) o.maxY = y;
+        o.ink += (0.2126 * px[j] + 0.7152 * px[j + 1] + 0.0722 * px[j + 2]) / 255;
+        o.hue += (Math.max(px[j], px[j + 1], px[j + 2]) - Math.min(px[j], px[j + 1], px[j + 2])) / 255;
+        o.n++;
+      }
+      return o;
+    }
+    // The first gap: empty columns, at least 3% of the width.
+    var need = Math.max(2, Math.round((maxX - minX) * 0.03)), run = 0, cut = -1;
+    for (var x = minX; x <= maxX && cut < 0; x++) {
+      var empty = true;
+      for (var y = minY; y <= maxY && empty; y++) if (px[(y * w + x) * 4 + 3] >= 90) empty = false;
+      run = empty ? run + 1 : 0;
+      if (run >= need) cut = x - run;
+    }
+    if (cut < minX) return null;
+    var left = stats(minX, cut), right = stats(cut + run + 1, maxX);
+    if (!left.n || !right.n) return null;
+    var colored = left.hue / left.n > 0.35, plain = right.hue / right.n < 0.15;
+    var symbolish = (left.maxX - left.minX + 1) < 1.9 * (left.maxY - left.minY + 1);
+    return colored && plain && symbolish ? left : null;
   }
 
   /**
@@ -234,18 +303,19 @@ var Home = (function () {
     var cover = new Float32Array(n);
     for (i = 0; i < n; i++) cover[i] = px[i * 4 + 3] / 255;
     var raw = new Float32Array(cover);
-    boxBlur(cover, W, H, f); boxBlur(cover, W, H, f);
+    var rc = Math.max(1, Math.round(f * 0.6));
+    boxBlur(cover, W, H, rc); boxBlur(cover, W, H, rc);
     // The mark's colors from well inside it: the edge pixels (part background) take them instead of their own.
     var inner = [new Float32Array(n), new Float32Array(n), new Float32Array(n), new Float32Array(n)];
     for (i = 0; i < n; i++) {
-      var w = raw[i] > 0.99 && cover[i] > 0.998 ? 1 : 0;
+      var w = raw[i] > 0.99 && cover[i] > 0.99 ? 1 : 0;
       inner[0][i] = px[i * 4] * w; inner[1][i] = px[i * 4 + 1] * w; inner[2][i] = px[i * 4 + 2] * w; inner[3][i] = w;
     }
     var r = 2 * f;   // far enough to reach inside from the outermost edge
     for (k = 0; k < 4; k++) { boxBlur(inner[k], W, H, r); boxBlur(inner[k], W, H, r); }
     for (i = 0; i < n; i++) {
       j = i * 4;
-      var wi = inner[3][i], deep = raw[i] > 0.99 && cover[i] > 0.998;
+      var wi = inner[3][i], deep = raw[i] > 0.99 && cover[i] > 0.99;
       if (wi > 0.02) {
         for (k = 0; k < 3; k++) {
           var near = inner[k][i] / wi;
