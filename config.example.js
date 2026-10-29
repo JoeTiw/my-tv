@@ -9,6 +9,12 @@ window.TIWARI = {
   longitude: 85.3240,
   units: 'C',                 // 'C' or 'F'
 
+  // The words on the TV: 'en' (English) or 'ne' (नेपाली). The phone page can switch it too.
+  language: 'en',
+  // Optional: the greeting says "Good evening, Tiwari family" (and in Nepali: शुभ सन्ध्या, तिवारी परिवार).
+  familyName: '',
+  familyNameNe: '',
+
   // Your private phone channel on ntfy.sh: open https://ntfy.sh/<channel> on your phone to send to the TV.
   // A long random name is the only lock: anyone who knows it can send to your TV. Setup makes one.
   channel: 'CHANNEL',
@@ -29,6 +35,7 @@ window.TIWARI = {
   //   {name: "Ama's birthday", bs: '05-14', birthday: true}     every year on Bhadra 14 (BS month-day)
   //   {name: "Papa's birthday", ad: '03-21', birthday: true}    every year on March 21
   //   {name: 'Trip to Pokhara', date: '2026-12-20'}             once
+  // In Nepali, nameNe (and personNe for a birthday) say them in Nepali: {name: "Ama's birthday", nameNe: 'आमाको जन्मदिन', personNe: 'आमा', ...}
   events: [],
 
   // The photo frame starts after this many quiet minutes (when it has photos).

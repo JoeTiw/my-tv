@@ -168,6 +168,7 @@
 
   /* Look */
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 18px; background: rgba(0, 0, 0, 0.22); }
+  .seg.two { grid-template-columns: 1fr 1fr; }
   .seg button { padding: 10px 0; border-radius: 14px; font-weight: 600; color: var(--soft); }
   .seg button.on { background: rgba(255, 255, 255, 0.18); color: var(--ink); }
   .swatches { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
@@ -265,6 +266,9 @@
       <h2>The look</h2>
       <div class="seg" id="theme">
         <button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button>
+      </div>
+      <div class="seg two" id="lang" style="margin-top: 12px">
+        <button data-l="en">English</button><button data-l="ne">नेपाली</button>
       </div>
       <div class="swatches" id="swatches"></div>
       <div class="grid2">
@@ -586,6 +590,16 @@
       send('/theme ' + b.dataset.t).then(sent('Theme: ' + b.textContent), failed);
     };
   });
+  var langNow = stored('lang') || 'en';
+  Array.prototype.forEach.call($('lang').children, function (b) {
+    b.classList.toggle('on', b.dataset.l === langNow);
+    b.onclick = function () {
+      store('lang', b.dataset.l);
+      Array.prototype.forEach.call($('lang').children, function (x) { x.classList.toggle('on', x === b); });
+      send('/lang ' + b.dataset.l).then(sent(b.dataset.l === 'ne' ? 'टिभी अब नेपालीमा' : 'The TV is in English now'), failed);
+    };
+  });
+
   COLORS.forEach(function (c) {
     var s = document.createElement('button');
     s.className = 'swatch';

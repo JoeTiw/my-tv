@@ -33,23 +33,23 @@ var Calendar = (function () {
   var DAY = 86400000;
 
   // Festivals from the government's list of public holidays for 2083 (and the days of Tihar from the Nepali
-  // calendar), as AD dates. [date, name, greeting on the day]
+  // calendar), as AD dates. [date, name, greeting on the day, both in Nepali]
   var FESTIVALS = [
-    ['2026-11-08', 'Laxmi Puja', 'Happy Tihar!'],
-    ['2026-11-10', 'Mha Puja', 'Happy Mha Puja!'],
-    ['2026-11-11', 'Bhai Tika', 'Happy Bhai Tika!'],
-    ['2026-11-15', 'Chhath', 'Happy Chhath!'],
-    ['2026-12-24', 'Yomari Punhi', 'Happy Yomari Punhi!'],
-    ['2026-12-25', 'Christmas', 'Merry Christmas!'],
-    ['2026-12-30', 'Tamu Lhosar', 'Happy Tamu Lhosar!'],
-    ['2027-01-01', 'New Year (AD)', 'Happy New Year!'],
-    ['2027-01-15', 'Maghe Sankranti', 'Happy Maghe Sankranti!'],
-    ['2027-02-07', 'Sonam Lhosar', 'Happy Sonam Lhosar!'],
-    ['2027-02-11', 'Basanta Panchami', 'Happy Saraswati Puja!'],
-    ['2027-03-06', 'Maha Shivaratri', 'Happy Maha Shivaratri!'],
-    ['2027-03-09', 'Gyalpo Lhosar', 'Happy Gyalpo Lhosar!'],
-    ['2027-03-21', 'Holi', 'Happy Holi!'],
-    ['2027-04-06', 'Ghode Jatra', 'Happy Ghode Jatra!']
+    ['2026-11-08', 'Laxmi Puja', 'Happy Tihar!', 'लक्ष्मी पूजा', 'शुभ दीपावली!'],
+    ['2026-11-10', 'Mha Puja', 'Happy Mha Puja!', 'म्ह पूजा', 'म्ह पूजाको शुभकामना!'],
+    ['2026-11-11', 'Bhai Tika', 'Happy Bhai Tika!', 'भाइटीका', 'भाइटीकाको शुभकामना!'],
+    ['2026-11-15', 'Chhath', 'Happy Chhath!', 'छठ', 'छठ पर्वको शुभकामना!'],
+    ['2026-12-24', 'Yomari Punhi', 'Happy Yomari Punhi!', 'योमरी पुन्हि', 'योमरी पुन्हिको शुभकामना!'],
+    ['2026-12-25', 'Christmas', 'Merry Christmas!', 'क्रिसमस', 'क्रिसमसको शुभकामना!'],
+    ['2026-12-30', 'Tamu Lhosar', 'Happy Tamu Lhosar!', 'तमु ल्होसार', 'तमु ल्होसारको शुभकामना!'],
+    ['2027-01-01', 'New Year (AD)', 'Happy New Year!', 'अंग्रेजी नयाँ वर्ष', 'नयाँ वर्षको शुभकामना!'],
+    ['2027-01-15', 'Maghe Sankranti', 'Happy Maghe Sankranti!', 'माघे संक्रान्ति', 'माघे संक्रान्तिको शुभकामना!'],
+    ['2027-02-07', 'Sonam Lhosar', 'Happy Sonam Lhosar!', 'सोनाम ल्होसार', 'सोनाम ल्होसारको शुभकामना!'],
+    ['2027-02-11', 'Basanta Panchami', 'Happy Saraswati Puja!', 'बसन्त पञ्चमी', 'सरस्वती पूजाको शुभकामना!'],
+    ['2027-03-06', 'Maha Shivaratri', 'Happy Maha Shivaratri!', 'महाशिवरात्रि', 'महाशिवरात्रिको शुभकामना!'],
+    ['2027-03-09', 'Gyalpo Lhosar', 'Happy Gyalpo Lhosar!', 'ग्याल्पो ल्होसार', 'ग्याल्पो ल्होसारको शुभकामना!'],
+    ['2027-03-21', 'Holi', 'Happy Holi!', 'होली', 'होलीको शुभकामना!'],
+    ['2027-04-06', 'Ghode Jatra', 'Happy Ghode Jatra!', 'घोडेजात्रा', 'घोडेजात्राको शुभकामना!']
   ];
 
   // MARK: - Dates
@@ -105,34 +105,44 @@ var Calendar = (function () {
   function upcoming(now, days) {
     now = now || new Date();
     var start = dayNumber(now), end = start + days, out = [];
-    function add(date, name, greeting, kind) {
+    function add(date, name, greeting, kind, nameNe, greetingNe) {
       if (!date) return;
       var n = dayNumber(date);
-      if (n >= start && n <= end) out.push({name: name, greeting: greeting, kind: kind, date: date, inDays: n - start});
+      if (n >= start && n <= end) {
+        out.push({name: name, greeting: greeting, nameNe: nameNe || name, greetingNe: greetingNe || greeting, kind: kind,
+          date: date, inDays: n - start});
+      }
     }
-    FESTIVALS.forEach(function (f) { add(fromAd(f[0]), f[1], f[2], 'festival'); });
+    FESTIVALS.forEach(function (f) { add(fromAd(f[0]), f[1], f[2], 'festival', f[3], f[4]); });
     var b = toBS(now), y = b ? b.year : 0;
     if (y) {
-      add(fromBS(y + 1, 0, 1), 'Nepali New Year ' + (y + 1), 'Naya Barsha ' + (y + 1) + ' ko shubhakamana!', 'festival');
+      add(fromBS(y + 1, 0, 1), 'Nepali New Year ' + (y + 1), 'Naya Barsha ' + (y + 1) + ' ko shubhakamana!', 'festival',
+        'नयाँ वर्ष ' + nepaliDigits(y + 1), 'नयाँ वर्ष ' + nepaliDigits(y + 1) + ' को शुभकामना!');
     }
     (C.events || []).forEach(function (e) {
       if (!e || !e.name) return;
-      var greeting = e.birthday ? 'Happy birthday, ' + e.name.replace(/'s birthday$/i, '') + '!' : e.greeting || e.name;
+      var person = e.name.replace(/'s birthday$/i, '');
+      var greeting = e.birthday ? 'Happy birthday, ' + person + '!' : e.greeting || e.name;
+      var greetingNe = e.greetingNe || (e.birthday ? 'जन्मदिनको शुभकामना, ' + (e.personNe || person) + '!' : e.nameNe || e.name);
       var kind = e.birthday ? 'birthday' : 'event', m;
-      if (e.date) add(fromAd(e.date), e.name, greeting, kind);
+      function at(date) { add(date, e.name, greeting, kind, e.nameNe, greetingNe); }
+      if (e.date) at(fromAd(e.date));
       else if (e.ad && (m = /^(\d\d?)-(\d\d?)$/.exec(e.ad))) {
-        for (var k = 0; k < 2; k++) add(new Date(now.getFullYear() + k, +m[1] - 1, +m[2]), e.name, greeting, kind);
+        for (var k = 0; k < 2; k++) at(new Date(now.getFullYear() + k, +m[1] - 1, +m[2]));
       } else if (e.bs && (m = /^(\d\d?)-(\d\d?)$/.exec(e.bs)) && y) {
-        for (var j = 0; j < 2; j++) add(fromBS(y + j, +m[1] - 1, +m[2]), e.name, greeting, kind);
+        for (var j = 0; j < 2; j++) at(fromBS(y + j, +m[1] - 1, +m[2]));
       }
     });
     out.sort(function (a, c) { return a.inDays - c.inDays; });
     return out;
   }
 
-  function when(e) {
-    return e.inDays === 0 ? 'Today' : e.inDays === 1 ? 'Tomorrow'
-      : e.inDays < 7 ? 'This ' + U.DAYS[e.date.getDay()] : 'In ' + e.inDays + ' days';
+  /** "In 10 days": in the TV's language on screen, in English for the assistant. */
+  function when(e, onScreen) {
+    var t = onScreen ? L.t : function (s, v) { return v ? s.replace(/\{(\w+)\}/g, function (x, k) { return v[k]; }) : s; };
+    return e.inDays === 0 ? t('Today') : e.inDays === 1 ? t('Tomorrow')
+      : e.inDays < 7 ? t('This {day}', {day: onScreen ? L.day(e.date.getDay()) : U.DAYS[e.date.getDay()]})
+      : t('In {n} days', {n: e.inDays});
   }
 
   // MARK: - On screen
@@ -152,8 +162,11 @@ var Calendar = (function () {
     var t = today(now), line = U.$('nepali');
     if (t) {
       line.innerHTML = '';
-      U.el('span', '', line, t.en);
-      if (C.nepaliScript !== false) U.el('span', 'ne', line, t.ne);
+      if (L.ne) U.el('span', '', line, t.ne);
+      else {
+        U.el('span', '', line, t.en);
+        if (C.nepaliScript !== false) U.el('span', 'ne', line, t.ne);
+      }
     }
     var box = U.$('days');
     box.innerHTML = '';
@@ -161,8 +174,8 @@ var Calendar = (function () {
     list.forEach(function (e) {
       var pill = U.el('div', 'pill glass day' + (e.inDays === 0 ? ' today' : ''), box);
       pill.innerHTML = ICON[e.kind] || ICON.event;
-      if (e.inDays === 0) U.el('b', '', pill, e.greeting);
-      else { U.el('b', '', pill, e.name); U.el('span', 'soft', pill, ' · ' + when(e)); }
+      if (e.inDays === 0) U.el('b', '', pill, L.ne ? e.greetingNe : e.greeting);
+      else { U.el('b', '', pill, L.ne ? e.nameNe : e.name); U.el('span', 'soft', pill, ' · ' + when(e, true)); }
     });
   }
 

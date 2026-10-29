@@ -90,7 +90,7 @@ var Frame = (function () {
   function tick() {
     var now = new Date(), t = U.time(now), bs = Calendar.today(now);
     clock.innerHTML = t.hm + '<span>' + t.ampm + '</span>';
-    date.textContent = U.longDate(now) + (bs ? ' · ' + bs.en : '');
+    date.textContent = U.longDate(now) + (bs ? ' · ' + (L.ne ? bs.ne : bs.en) : '');
   }
 
   function show() {
@@ -102,7 +102,7 @@ var Frame = (function () {
     slides[front].className = 'slide off';
     front = 1 - front;
     var d = new Date(p.at);
-    caption.textContent = (p.from ? 'From ' + p.from + ' · ' : '') + U.longDate(d).replace(/^\w+, /, '');
+    caption.textContent = (p.from ? L.t('From {name}', {name: p.from}) + ' · ' : '') + U.longDate(d).replace(/^[^,]+, /, '');
     tick();
   }
 

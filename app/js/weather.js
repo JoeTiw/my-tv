@@ -63,8 +63,9 @@ var Weather = (function () {
 
   function render(box) {
     if (!last) { U.cls(box, 'on', false); return; }
-    box.innerHTML = ICONS[last.kind] + '<b>' + last.temp + '°</b>' + '<span>' + (C.city ? C.city + ' · ' : '')
-      + WORDS[last.kind] + '</span><span class="soft"> · ' + last.hi + '° / ' + last.lo + '°</span>';
+    var city = L.ne ? C.cityNe || (C.city === 'Kathmandu' ? 'काठमाडौं' : C.city) : C.city;
+    box.innerHTML = ICONS[last.kind] + '<b>' + L.num(last.temp) + '°</b>' + '<span>' + (city ? city + ' · ' : '')
+      + L.t(WORDS[last.kind]) + '</span><span class="soft"> · ' + L.num(last.hi) + '° / ' + L.num(last.lo) + '°</span>';
     U.cls(box, 'on', true);
   }
 

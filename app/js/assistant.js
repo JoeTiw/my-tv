@@ -51,6 +51,8 @@ var Assistant = (function () {
       'Streaming catalogue to think about: ' + (C.region || 'IN') + ' (country code).',
       'Apps on this TV:\n' + apps,
       '',
+      L.ne ? 'The family has the TV in Nepali: write "say" and "why" in Nepali (Devanagari), whatever language they used; keep titles as they are known.'
+        : 'Answer in the language they wrote in.',
       'Reply with ONLY a JSON object, no other text:',
       '{"say": "<warm, short reply, at most 2 sentences>", "action": <one of>}',
       '  {"type": "open_app", "app_id": "<one of the app_ids above>"}',
@@ -124,19 +126,19 @@ var Assistant = (function () {
       var app = appById(it.app_id), card = U.el('div', 'rec', recsBox);
       var p = U.el('div', 'poster', card, it.title);
       U.el('div', 't', card, it.title + (it.year ? ' (' + it.year + ')' : ''));
-      U.el('div', 's', card, (app ? app.title : 'Where to watch: unsure') + (it.why ? ' · ' + it.why : ''));
+      U.el('div', 's', card, (app ? app.title : L.t('Where to watch: unsure')) + (it.why ? ' · ' + it.why : ''));
       poster(it, function (src) { if (src) { p.style.backgroundImage = 'url("' + src + '")'; U.cls(p, 'img', true); } });
       card.addEventListener('click', function () { pick(items, nodes.indexOf(card)); });
       nodes.push(card);
     });
-    hint.textContent = items.length ? 'OK opens it · Back closes' : '';
+    hint.textContent = items.length ? L.t('OK opens it · Back closes') : '';
     Home.setRecs({nodes: nodes, ok: function (i) { pick(items, i); }, back: close});
   }
 
   function pick(items, i) {
     var it = items[i], app = it && appById(it.app_id);
-    if (!app) { Home.toast('Not sure which app has ' + (it ? it.title : 'that')); return; }
-    Home.toast('Opening ' + app.title + ' · search for “' + it.title + '”');
+    if (!app) { Home.toast(L.t('Not sure which app has {title}', {title: it ? it.title : '?'})); return; }
+    Home.toast(L.t('Opening {app} · search for “{title}”', {app: app.title, title: it.title}));
     close();
     Home.open(app);
   }
@@ -150,7 +152,7 @@ var Assistant = (function () {
       if (app) {
         setTimeout(function () { close(); Home.open(app); }, OPEN_DELAY_MS);
       } else {
-        said.textContent = say + ' (That app isn\'t on this TV.)';
+        said.textContent = say + ' ' + L.t("(That app isn't on this TV.)");
       }
     } else if (a.type === 'recommend') {
       recommend(a.items);
@@ -169,7 +171,7 @@ var Assistant = (function () {
     question = String(question || '').replace(/^\s+|\s+$/g, '');
     if (!question) return;
     if (!KEY) {
-      show(question, 'The assistant needs a Claude key first. Add it to config.js on your computer, then install again.');
+      show(question, L.t('The assistant needs a Claude key first. Add it to config.js on your computer, then install again.'));
       Inbox.reply('The assistant needs a Claude key first (claudeKey in app/config.js).');
       return;
     }
@@ -178,14 +180,14 @@ var Assistant = (function () {
     recsBox.innerHTML = '';
     hint.textContent = '';
     Home.setRecs(null);
-    show(question, 'Thinking…', true);
+    show(question, L.t('Thinking…'), true);
     askClaude(question, function (err, answer) {
       busy = false;
       if (err) {
-        var msg = /HTTP 401/.test(err.message) ? 'My Claude key was refused. Check claudeKey in config.js.'
+        var msg = L.t(/HTTP 401/.test(err.message) ? 'My Claude key was refused. Check claudeKey in config.js.'
           : /HTTP 429/.test(err.message) ? 'Too many questions at once. Try again in a minute.'
           : /HTTP 400/.test(err.message) && /credit|billing/i.test(err.message) ? 'The Claude account is out of credit.'
-          : 'I couldn\'t reach Claude just now. Try again in a moment.';
+          : "I couldn't reach Claude just now. Try again in a moment.");
         show(question, msg, false);
         Inbox.reply(msg);
         return;

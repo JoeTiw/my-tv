@@ -20,6 +20,7 @@ var Home = (function () {
 
   function tick() {
     var now = new Date(), t = U.time(now);
+    $('greet').textContent = L.greeting(now) + (C.familyName ? ', ' + (L.ne && C.familyNameNe ? C.familyNameNe : C.familyName) : '');
     $('clock').innerHTML = t.hm + '<span class="ampm">' + t.ampm + '</span>';
     $('date').textContent = U.longDate(now);
     Calendar.render();
@@ -111,8 +112,8 @@ var Home = (function () {
   }
 
   function open(app) {
-    toast('Opening ' + app.title);
-    TV.launch(app.id, function (err) { if (err) toast(app.title + " didn't open"); });
+    toast(L.t('Opening {app}', {app: app.title}));
+    TV.launch(app.id, function (err) { if (err) toast(L.t("{app} didn't open", {app: app.title})); });
   }
 
   // MARK: - Focus: the dock, or the assistant's cards when they show

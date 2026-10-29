@@ -57,6 +57,15 @@ The festival dates come from the government's list of public holidays for 2083 (
 gets added when it's published, around April 2027. The BS month lengths (2080 to 2090) are from
 [nepali-date-converter](https://github.com/subeshb1/Nepali-Date) (MIT) and match every date in the 2083 list.
 
+## Greeting and language
+
+Above the clock, a greeting for the time of day ("Good evening", or "Good evening, Tiwari family" with `familyName`
+in `app/config.js`). The phone page's **The look** card switches the TV between **English** and **नेपाली**: in Nepali the
+greeting (शुभ प्रभात, शुभ सन्ध्या…), the clock (in Devanagari digits, with बिहान, दिउँसो, बेलुका, राति), the dates, the
+weather, the festivals and countdowns, the notes' times and the assistant's answers are all in Nepali. Give your
+events a Nepali name with `nameNe` (and `personNe` for a birthday greeting). `language: 'ne'` in `app/config.js`
+starts it in Nepali; from ntfy, `/lang ne` or `/lang en`.
+
 ## The photo frame
 
 On the phone page, **Photo frame → Add photos** (several at once). When nobody has touched the remote for a few
@@ -130,6 +139,7 @@ You can also send from ntfy's own page or app (`https://ntfy.sh/<your channel>`)
 | `/open netflix` (an app id or name) | opens that app |
 | `/bg #ffb3c6` · `/bg <image link>` · `/bg off` | a color, a picture from the web, or the normal sky |
 | `/theme dark` · `light` · `auto` | the look |
+| `/lang ne` · `/lang en` | the TV in Nepali or English |
 | `/clear` | takes the notes away |
 | `/vol up` · `/vol down 3` · `/vol 20` · `/mute` | the volume (needs the helper) |
 | `/key play` · `pause` · `back` · `home` | a remote button (needs the helper) |
@@ -160,6 +170,7 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | `remote/index.html` | the phone's remote page (GitHub Pages) |
 | `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
+| `app/js/lang.js` | the words on the TV, in English and Nepali |
 | `app/js/calendar.js` | the Nepali date, festivals, birthdays |
 | `app/js/frame.js` | the photo frame |
 | `app/js/platform.js` | the TV's apps and opening them (webOS Luna) |

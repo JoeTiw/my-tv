@@ -38,7 +38,7 @@ var Inbox = (function () {
       card.innerHTML = HEART;
       U.el('div', 'text', card, n.text);
       var t = U.time(new Date(n.at));
-      U.el('div', 'meta', card, (n.from ? n.from + ' · ' : '') + t.hm + ' ' + t.ampm);
+      U.el('div', 'meta', card, (n.from ? n.from + ' · ' : '') + t.hm + ' ' + t.ampm);   // U.time speaks the TV's language
       (function (card) { setTimeout(function () { U.cls(card, 'on', true); }, 30); })(card);
     }
   }
@@ -107,20 +107,24 @@ var Inbox = (function () {
   function command(text, fresh) {
     var parts = text.replace(/^\s+|\s+$/g, '').split(/\s+/), name = parts[0].toLowerCase(), arg = parts.slice(1).join(' ');
     if (name === '/clear') { notes = []; big = null; U.save('notes', notes); render(); }
-    else if (name === '/theme') { if (Home.setTheme(arg.toLowerCase())) Home.toast('Theme: ' + arg.toLowerCase()); }
+    else if (name === '/theme') { if (Home.setTheme(arg.toLowerCase())) Home.toast(L.t('Theme: {name}', {name: L.t(arg.toLowerCase())})); }
+    else if (name === '/lang' && (arg === 'ne' || arg === 'en')) {
+      // Only when it changes: a page load replays the message, and it must not reload again.
+      if (arg !== L.lang) { U.save('lang', arg); setTimeout(function () { location.reload(); }, 400); }
+    }
     else if (name === '/bg' || name === '/background') {
       if (/^(off|none|reset)$/i.test(arg)) Home.setWall(null);
       else if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(arg)) Home.setWall({kind: 'color', color: arg});
       else if (/^https?:\/\/\S+$/i.test(arg)) keepPhoto(arg);
     }
     else if (name === '/frame') {
-      if (arg === 'clear') { Frame.clear(); reply('The photo frame is empty now.'); }
+      if (arg === 'clear') { Frame.clear(); reply(L.t('The photo frame is empty now.')); }
       else if (arg === 'stop') Frame.stop();
-      else if (arg === 'start' && fresh && !Frame.start()) reply('There are no photos in the frame yet.');
+      else if (arg === 'start' && fresh && !Frame.start()) reply(L.t('There are no photos in the frame yet.'));
     }
     else if (name === '/open' && fresh) {
       var app = findApp(arg);
-      if (app) Home.open(app); else Home.toast('No app called ' + arg + ' on this TV');
+      if (app) Home.open(app); else Home.toast(L.t('No app called {name} on this TV', {name: arg}));
     }
   }
 
@@ -223,8 +227,9 @@ var Inbox = (function () {
       if (ok) added++; else missed++;
       clearTimeout(addedTimer);
       addedTimer = setTimeout(function () {
-        var text = (added ? 'Added ' + added + ' photo' + (added > 1 ? 's' : '') + ' to the frame (' + Frame.count() + ' in it).' : '')
-          + (missed ? ' ' + missed + " couldn't be picked up (ntfy keeps photos only a few hours)." : '');
+        var text = (added ? L.t('Added {n} photos to the frame ({total} in it).', {n: added, total: Frame.count()}) : '')
+          + (missed ? ' ' + L.t("{n} couldn't be picked up (ntfy keeps photos only a few hours).", {n: missed}) : '');
+        if (!L.ne && added === 1) text = text.replace('1 photos', '1 photo');
         added = missed = 0;
         if (text) { reply(text.replace(/^ /, '')); Home.toast(text.replace(/^ /, '').split(' (')[0]); }
       }, 4000);

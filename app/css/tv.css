@@ -74,8 +74,11 @@ body {
 /* MARK: - Clock, date, weather */
 
 #now { position: absolute; left: 96px; top: 70px; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.18); }
+#greet { font-size: 36px; font-weight: 500; margin-bottom: 2px; opacity: 0.88; letter-spacing: 0.2px; }
 #clock { font-size: 200px; font-weight: 200; letter-spacing: -6px; line-height: 1; }
 #clock .ampm { font-size: 44px; font-weight: 400; letter-spacing: 0; margin-left: 14px; vertical-align: 118px; opacity: 0.85; }
+.lang-ne #clock .ampm { font-size: 40px; vertical-align: 96px; }
+.lang-ne #frame .clock span { font-size: 28px; vertical-align: 50px; }
 #date { font-size: 46px; font-weight: 400; margin-top: 6px; opacity: 0.92; }
 .pill { display: inline-block; margin-top: 30px; padding: 16px 30px 16px 22px; border-radius: 40px; font-size: 30px; white-space: nowrap; }
 #weather { visibility: hidden; text-shadow: none; }
