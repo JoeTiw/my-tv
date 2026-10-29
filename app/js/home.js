@@ -85,13 +85,31 @@ var Home = (function () {
    * see-through (gradually, so the edges stay smooth), and what's left is cropped to the mark. done(null) for a
    * picture (nothing taken away), or an icon the TV won't let the page read.
    */
+  // Lifting (and enlarging) takes the TV a moment: what came out is kept, by a short fingerprint of the icon.
+  var LIFT_VERSION = 3, kept = U.load('lifted');
+  if (!kept || kept.v !== LIFT_VERSION) kept = {v: LIFT_VERSION, marks: {}};
+  function print(src) {
+    var h = 0;
+    for (var i = 0; i < src.length; i += 7) h = (h * 31 + src.charCodeAt(i)) | 0;
+    return src.length + ':' + h;
+  }
+  function keepMark(key, out) {
+    kept.marks[key] = out || false;
+    var keys = Object.keys(kept.marks);
+    if (keys.length > 40) delete kept.marks[keys[0]];
+    try { U.save('lifted', kept); } catch (e) { kept.marks = {}; }
+  }
+
   function lift(src, done) {
     if (lifted[src] !== undefined) { done(lifted[src] || null); return; }
+    var key = print(src);
+    if (kept.marks[key] !== undefined) { lifted[src] = kept.marks[key]; done(lifted[src] || null); return; }
     var img = new Image();
     img.onload = function () {
       var out = null;
       try { out = liftNow(img); } catch (e) { out = null; }
       lifted[src] = out || false;
+      if (src.indexOf('data:') === 0) keepMark(key, out);   // the TV's own files may change; the helper's don't
       done(out);
     };
     img.onerror = function () { lifted[src] = false; done(null); };
@@ -124,12 +142,45 @@ var Home = (function () {
       vote(w - 1 - inset, Math.round(inset + f * (h - 2 * inset - 1)));
     }
     if (bestN < n * 0.5) return null;   // no one background color: a picture
+    // Only the background around the mark goes: what's like it but enclosed by the mark (a white play sign on a
+    // white icon) stays. The background is followed in from the edges, through pixels like it.
+    var keeps = new Float32Array(w * h), outside = new Uint8Array(w * h), q, p;
+    if (best) {
+      for (p = 0; p < w * h; p++) {
+        q = p * 4;
+        var dd = Math.max(Math.abs(px[q] - best[0]), Math.abs(px[q + 1] - best[1]), Math.abs(px[q + 2] - best[2])) / 255;
+        keeps[p] = px[q + 3] < 8 ? 0 : Math.max(0, Math.min(1, (dd - 0.1) / 0.22));
+      }
+      var stack = [];
+      for (var e = 0; e < w; e++) { stack.push(e); stack.push((h - 1) * w + e); }
+      for (e = 0; e < h; e++) { stack.push(e * w); stack.push(e * w + w - 1); }
+      while (stack.length) {
+        p = stack.pop();
+        if (outside[p] || keeps[p] >= 1) continue;
+        outside[p] = 1;
+        var px0 = p % w;
+        if (px0 > 0) stack.push(p - 1);
+        if (px0 < w - 1) stack.push(p + 1);
+        if (p >= w) stack.push(p - w);
+        if (p < w * (h - 1)) stack.push(p + w);
+      }
+      // Edge pixels touching the background only at a corner belong to it too.
+      var near = new Uint8Array(outside);
+      for (p = 0; p < w * h; p++) {
+        if (outside[p] || keeps[p] >= 1) continue;
+        var cx = p % w, cy = (p / w) | 0;
+        for (var oy = -1; oy <= 1 && !near[p]; oy++) for (var ox = -1; ox <= 1; ox++) {
+          var nx = cx + ox, ny = cy + oy;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < h && outside[ny * w + nx]) { near[p] = 1; break; }
+        }
+      }
+      outside = near;
+    }
     var minX = w, minY = h, maxX = -1, maxY = -1, ink = 0, hue = 0, inkN = 0;
-    for (var p = 0; p < w * h; p++) {
+    for (p = 0; p < w * h; p++) {
       var j = p * 4, a = px[j + 3] / 255;
-      if (best) {
-        var d = Math.max(Math.abs(px[j] - best[0]), Math.abs(px[j + 1] - best[1]), Math.abs(px[j + 2] - best[2])) / 255;
-        var keep = Math.max(0, Math.min(1, (d - 0.1) / 0.22));
+      if (best && outside[p]) {
+        var keep = keeps[p];
         // An edge pixel is part mark, part background: take the background out of its color too, so the edge stays
         // clean instead of a dark (or light) fringe that looks jagged on the glass.
         if (keep > 0 && keep < 1) {
@@ -157,7 +208,87 @@ var Home = (function () {
     crop.getContext('2d').drawImage(c, minX, minY, crop.width, crop.height, 0, 0, crop.width, crop.height);
     // A black or gray mark would vanish on smoky glass: it's shown white. A colored one (red letters) stays.
     var bgHex = best ? '#' + ((1 << 24) | (best[0] << 16) | (best[1] << 8) | best[2]).toString(16).slice(1) : '';
-    return {src: crop.toDataURL('image/png'), w: crop.width, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+    var big = enlarge(crop, 150, 86, true);   // a small icon's mark: made big enough for the tile, edges crisp
+    return {src: big.toDataURL('image/png'), w: crop.width, dark: inkN && ink / inkN < 0.25 && hue / inkN < 0.2, bg: bgHex};
+  }
+
+  /**
+   * A small picture made big enough to show without the TV stretching it. Smoothly enlarged, then sharpened (its
+   * colors against a blur of themselves) and, for a lifted mark, its soft edges tightened: a logo is flat shapes
+   * with hard edges, so this gets close to how it was drawn. A picture that's big enough is left as it is.
+   */
+  function enlarge(src, wantW, wantH, crispEdges) {
+    var sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+    var f = Math.min(4, Math.ceil(Math.max(wantW / sw, wantH / sh) - 0.15));
+    if (f < 2) return src;
+    // A margin of two of the small picture's pixels all round, so the smoothing can round the outline there too.
+    var m = crispEdges ? 2 * f : 0, W = sw * f + 2 * m, H = sh * f + 2 * m, c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    var g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+    g.drawImage(src, m, m, sw * f, sh * f);
+    var data = g.getImageData(0, 0, W, H), px = data.data, n = W * H, i, k, j;
+    // How covered each spot is, smoothed over about one pixel of the small picture: its outline, without the steps.
+    var cover = new Float32Array(n);
+    for (i = 0; i < n; i++) cover[i] = px[i * 4 + 3] / 255;
+    var raw = new Float32Array(cover);
+    boxBlur(cover, W, H, f); boxBlur(cover, W, H, f);
+    // The mark's colors from well inside it: the edge pixels (part background) take them instead of their own.
+    var inner = [new Float32Array(n), new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+    for (i = 0; i < n; i++) {
+      var w = raw[i] > 0.99 && cover[i] > 0.998 ? 1 : 0;
+      inner[0][i] = px[i * 4] * w; inner[1][i] = px[i * 4 + 1] * w; inner[2][i] = px[i * 4 + 2] * w; inner[3][i] = w;
+    }
+    var r = 2 * f;   // far enough to reach inside from the outermost edge
+    for (k = 0; k < 4; k++) { boxBlur(inner[k], W, H, r); boxBlur(inner[k], W, H, r); }
+    for (i = 0; i < n; i++) {
+      j = i * 4;
+      var wi = inner[3][i], deep = raw[i] > 0.99 && cover[i] > 0.998;
+      if (wi > 0.02) {
+        for (k = 0; k < 3; k++) {
+          var near = inner[k][i] / wi;
+          // Inside: sharpened against its surroundings. At the edge: the color from inside.
+          px[j + k] = Math.max(0, Math.min(255, Math.round(deep ? px[j + k] + 0.5 * (px[j + k] - near) : near)));
+        }
+      }
+      if (crispEdges) {
+        var t = Math.max(0, Math.min(1, (cover[i] - 0.41) / 0.18));
+        px[j + 3] = Math.round(t * t * (3 - 2 * t) * 255);
+      }
+    }
+    g.putImageData(data, 0, 0);
+    return c;
+  }
+
+  /** A box blur of radius r over a W×H channel, in place (across, then down). */
+  function boxBlur(v, W, H, r) {
+    var tmp = new Float32Array(Math.max(W, H)), x, y, sum, cnt, span = 2 * r + 1;
+    for (y = 0; y < H; y++) {
+      var row = y * W;
+      sum = 0; cnt = 0;
+      for (x = -r; x <= r; x++) if (x >= 0 && x < W) { sum += v[row + x]; cnt++; }
+      for (x = 0; x < W; x++) {
+        tmp[x] = sum / cnt;
+        var out = x - r, inn = x + r + 1;
+        if (out >= 0) { sum -= v[row + out]; cnt--; }
+        if (inn < W) { sum += v[row + inn]; cnt++; }
+      }
+      for (x = 0; x < W; x++) v[row + x] = tmp[x];
+    }
+    for (x = 0; x < W; x++) {
+      sum = 0; cnt = 0;
+      for (y = -r; y <= r; y++) if (y >= 0 && y < H) { sum += v[y * W + x]; cnt++; }
+      for (y = 0; y < H; y++) {
+        tmp[y] = sum / cnt;
+        var o = y - r, ii = y + r + 1;
+        if (o >= 0) { sum -= v[o * W + x]; cnt--; }
+        if (ii < H) { sum += v[ii * W + x]; cnt++; }
+      }
+      for (y = 0; y < H; y++) v[y * W + x] = tmp[y];
+    }
+    return span;
   }
 
   function colorfulHex(hex) {
@@ -185,8 +316,15 @@ var Home = (function () {
         (function (t, word, src, tint, known, paths) {
           word.style.visibility = 'hidden';
           function plain() {
-            var img = U.el('img', 'icon', t);
+            var img = U.el('img', 'icon', t), done = false;
             img.onerror = function () { if (img.parentNode) img.parentNode.removeChild(img); word.style.visibility = ''; };
+            // A small picture: made big enough for its 100 px place first, so the TV doesn't stretch it.
+            img.onload = function () {
+              if (done) return;
+              done = true;
+              if (img.naturalWidth >= 100) return;
+              try { var c = enlarge(img, 100, 100, false); if (c !== img) img.src = c.toDataURL('image/png'); } catch (e) {}
+            };
             img.src = src;
           }
           lift(src, function (mark) {
