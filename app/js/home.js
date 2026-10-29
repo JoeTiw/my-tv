@@ -116,33 +116,48 @@ var Home = (function () {
     TV.launch(app.id, function (err) { if (err) toast(L.t("{app} didn't open", {app: app.title})); });
   }
 
-  // MARK: - Focus: the dock, or the assistant's cards when they show
+  // MARK: - Focus: the dock, tonight's picks above it, or the assistant's cards when they show
 
-  var zone = 'apps', recs = null;   // recs: {nodes, ok(i), back()} from the assistant
+  var zone = 'apps', recs = null, picks = null;   // {nodes, ok(i), back()} from the assistant and from Picks
 
   function show() {
     var tiles = $('apps').children;
     for (var i = 0; i < tiles.length; i++) U.cls(tiles[i], 'focus', zone === 'apps' && i === focus);
     if (recs) for (var j = 0; j < recs.nodes.length; j++) U.cls(recs.nodes[j], 'focus', zone === 'recs' && j === recs.at);
+    if (picks) for (var p = 0; p < picks.nodes.length; p++) U.cls(picks.nodes[p], 'focus', zone === 'picks' && p === picks.at);
     scrollDock();
   }
 
+  function row() { return zone === 'recs' ? recs : zone === 'picks' ? picks : null; }
+
   function move(dx, dy) {
+    var r = row();
     if (dy < 0 && recs && recs.nodes.length) zone = 'recs';
+    else if (dy < 0 && picks && picks.nodes.length) zone = 'picks';
     else if (dy > 0) zone = 'apps';
-    else if (zone === 'recs') recs.at = Math.max(0, Math.min(recs.nodes.length - 1, recs.at + dx));
+    else if (r) r.at = Math.max(0, Math.min(r.nodes.length - 1, r.at + dx));
     else focus = Math.max(0, Math.min(apps.length - 1, focus + dx));
     show();
   }
 
   function ok() {
-    if (zone === 'recs' && recs) recs.ok(recs.at);
+    var r = row();
+    if (r) r.ok(r.at);
     else if (apps[focus]) open(apps[focus]);
   }
 
   function back() {
     if (recs) { recs.back(); return; }
+    if (zone === 'picks') { zone = 'apps'; show(); return; }
     if (Inbox.dismiss()) return;
+  }
+
+  /** Tonight's picks (or none, with null). */
+  function setPicks(r) {
+    picks = r;
+    if (r) r.at = 0;
+    if (!r && zone === 'picks') zone = 'apps';
+    show();
   }
 
   /** The assistant's cards take the focus (or give it back, with null). */
@@ -215,7 +230,7 @@ var Home = (function () {
   }
 
   return {
-    start: start, toast: toast, setTheme: setTheme, setWall: setWall, setRecs: setRecs, loadApps: loadApps,
+    start: start, toast: toast, setTheme: setTheme, setWall: setWall, setRecs: setRecs, setPicks: setPicks, loadApps: loadApps,
     apps: function () { return apps; }, open: open
   };
 })();

@@ -57,6 +57,25 @@ The festival dates come from the government's list of public holidays for 2083 (
 gets added when it's published, around April 2027. The BS month lengths (2080 to 2090) are from
 [nepali-date-converter](https://github.com/subeshb1/Nepali-Date) (MIT) and match every date in the 2083 list.
 
+## The assistant
+
+Send `Hey TV, ...` from the phone page (or dictate it). It knows the TV's apps, the time, the weather today and
+tomorrow, the Nepali calendar, and what it has learned about your family. It can:
+
+- **open an app**: "Hey TV, open YouTube";
+- **recommend**: "Hey TV, something funny for the family", as cards; OK opens the title's app;
+- **play a trailer** on YouTube: "Hey TV, show me the trailer for Panchayat" (needs the TMDB key);
+- **remember** what you tell it: "Hey TV, we loved Panchayat", "Ama doesn't like horror"; later picks use it.
+  "Hey TV, forget what you know about us" clears it. It's kept on the TV only;
+- **answer questions about now**, looking them up on the web: cricket scores, the news, the rupee rate
+  (about $0.01 a search; `webSearch: false` turns it off; an account without web search just answers without it);
+- **switch the theme**, and **make tonight's picks again**.
+
+Netflix and Prime Video can only be opened to their home screens: they don't take a title from other apps.
+
+**Tonight's picks:** once a day, four titles chosen for your family appear above the dock, with pictures. ▲ from the
+apps reaches them, OK opens one (and it's remembered, so it isn't suggested again). `picks: false` turns them off.
+
 ## Greeting and language
 
 Above the clock, a greeting for the time of day ("Good evening", or "Good evening, Tiwari family" with `familyName`
@@ -168,7 +187,8 @@ Plain HTML, CSS and JavaScript (ES5, for older LG TVs), no frameworks:
 | `app/js/home.js` | clock, dock, focus and remote keys, day/night, background |
 | `app/js/inbox.js` | messages from the phone (ntfy.sh, live) |
 | `remote/index.html` | the phone's remote page (GitHub Pages) |
-| `app/js/assistant.js` | the assistant (Claude API) and its picks (TMDB) |
+| `app/js/assistant.js` | the assistant (Claude API, web search), its memory, cards and trailers (TMDB) |
+| `app/js/picks.js` | tonight's picks above the dock |
 | `app/js/weather.js` | weather and sunset (Open-Meteo, no key) |
 | `app/js/lang.js` | the words on the TV, in English and Nepali |
 | `app/js/calendar.js` | the Nepali date, festivals, birthdays |

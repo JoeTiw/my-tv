@@ -60,10 +60,12 @@ var TV = (function () {
   }
 
   /** Opens an app; done(err). */
-  function launch(id, done) {
+  /** Opens an app, with params for it (YouTube takes {contentTarget}); done(err). */
+  function launch(id, params, done) {
+    if (typeof params === 'function') { done = params; params = null; }
     done = done || function () {};
-    if (!onTV) { TV.launched.push(id); done(null); return; }
-    luna('luna://com.webos.applicationManager/launch', {id: id}, function (err) { done(err); });
+    if (!onTV) { TV.launched.push(params ? id + ' ' + JSON.stringify(params) : id); done(null); return; }
+    luna('luna://com.webos.applicationManager/launch', params ? {id: id, params: params} : {id: id}, function (err) { done(err); });
   }
 
   /**

@@ -247,6 +247,19 @@ body {
 #frame .date { font-size: 30px; margin-top: 10px; opacity: 0.92; }
 #frame .caption { position: absolute; right: 84px; bottom: 84px; font-size: 26px; font-weight: 500; z-index: 1; opacity: 0.85; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6); }
 
+/* MARK: - Tonight's picks: wide cards above the dock, on the right */
+
+#picks { position: absolute; right: 96px; top: 526px; white-space: nowrap; text-align: right; opacity: 0; visibility: hidden; -webkit-transition: opacity 0.4s; transition: opacity 0.4s; }
+#picks.on { opacity: 1; visibility: visible; }
+.assistant-on #picks, .framing #picks { opacity: 0; }
+#picks h3 { margin: 0 4px 10px 0; font-size: 22px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; opacity: 0.85; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25); }
+#picks .row { white-space: nowrap; }
+.rec.wide { width: 214px; margin: 0 0 0 18px; text-align: left; }
+.rec.wide .poster { width: 214px; height: 120px; border-radius: 20px; font-size: 22px; padding: 16px; }
+.rec.wide .poster.img { font-size: 0; padding: 0; }
+.rec.wide .t { font-size: 20px; margin-top: 10px; max-height: 26px; white-space: nowrap; text-overflow: ellipsis; }
+.rec.wide .s { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* MARK: - Toast */
 
 #toast {

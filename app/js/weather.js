@@ -20,8 +20,8 @@ var Weather = (function () {
     if (typeof C.latitude !== 'number' || typeof C.longitude !== 'number') { done(last); return; }
     var unit = C.units === 'F' ? '&temperature_unit=fahrenheit' : '';
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + C.latitude + '&longitude=' + C.longitude
-      + '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset'
-      + '&timezone=auto&forecast_days=1' + unit;
+      + '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weather_code'
+      + '&timezone=auto&forecast_days=2' + unit;
     U.http(url, {type: 'json'}, function (err, w) {
       if (!err && w && w.current && w.daily) {
         last = {
@@ -32,6 +32,11 @@ var Weather = (function () {
           lo: Math.round(w.daily.temperature_2m_min[0]),
           sunrise: w.daily.sunrise[0],
           sunset: w.daily.sunset[0],
+          tomorrow: w.daily.temperature_2m_max.length > 1 ? {
+            hi: Math.round(w.daily.temperature_2m_max[1]),
+            lo: Math.round(w.daily.temperature_2m_min[1]),
+            kind: w.daily.weather_code ? kind(w.daily.weather_code[1]) : ''
+          } : null,
           utcOffset: w.utc_offset_seconds,
           at: Date.now()
         };

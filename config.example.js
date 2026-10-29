@@ -23,6 +23,11 @@ window.TIWARI = {
   // It lives on your TV, so set a monthly spending limit on it in the Claude Console.
   claudeKey: '',
   claudeModel: 'claude-haiku-5-5',
+  // The assistant may look things up on the web for questions about now (about $0.01 a search). false: never.
+  webSearch: true,
+  country: 'NP',              // where you are, for those searches (two letters)
+  // Tonight's picks above the dock (one Claude request a day). false: none.
+  picks: true,
 
   // Movie posters for recommendations: a free TMDB key (themoviedb.org > Settings > API). Optional.
   tmdbKey: '',
